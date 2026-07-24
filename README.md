@@ -33,6 +33,36 @@ After all these models are trained, run the command:
 `python results.py --ml_model_name ML_MODEL_NAME --n_test 64 --model_name MODEL_NAME --equation [Poisson/ConvDiff] --numerical_solvers [jacobi/gs/ssor/jacobi_0.67/sor_1.5]`
 for all 10 combinations. All the results (plots and tables) can be in the results folder
 
+## Wall-Clock Benchmarks (Appendix: Wall-Clock Evaluation)
+
+The wall-clock study uses fast $O(N^2)$ implementations of the same discretizations
+(`fast_pde.py`, validated against `pde.py`/`numerical_solver.py` by `validate_fast_pde.py`),
+a scale-equivariant DeepONet corrector, and a lightweight scalar-feature router.
+
+Pipeline for one setting (equation `EQ` in `Poisson/ConvDiff`, grid size `N` in `31/63/127`):
+
+```
+# 1. train the corrector (FFT-generated ground truth, scale-equivariant)
+python train_fast_deeponet.py --equation EQ --N N --epochs 250
+
+# 2. fine-tune it on the residual distribution seen inside hybrid solves
+python finetune_deeponet_residual.py --equation EQ --N N --solver jacobi
+
+# 3. train the lightweight router (imitates the cost-aware greedy oracle, DAgger)
+python router_lite.py --equation EQ --N N --solver jacobi
+
+# 4. benchmark wall-clock time-to-tolerance
+python bench_wallclock.py --equation EQ --N N --solvers jacobi \
+    --ckp checkpoints/fast_deeponet_EQ_N_ft_best.pth \
+    --policies classical,oracle_ca,router,hints25
+
+# 5. regenerate the LaTeX tables used by the paper
+python gen_wallclock_tables.py
+```
+
+`run_deeponet_queue.sh`, `run_ft_queue.sh`, `run_router_queue.sh`, and
+`run_bench_queue.sh` reproduce every setting reported in the paper.
+
 ### Size of solver ensembles
 Train routers for `equation` = `Poisson` and `Helmholtz` for the following list of solver ensembles:
 * `jacobi,gs`

@@ -260,15 +260,18 @@ class HybridSolver(torch.nn.Module):
                         expert_predictions = self.suite_solver[i].iteration(u_prev)
                         all_expert_predictions += (expert_predictions,)
             else:
-                predictionsz = torch.zeros_like(u_prev)
+                predictionsz = u_prev.clone()
                 for i in range(len(self.suite_solver)):
                     if isinstance(self.suite_solver[i], MLSolver):
                         u_new_i = u_prev[use_ml_solver == i] + self.suite_solver[i](inputs[use_ml_solver == i]) if self.dim == 1 else u_prev[use_ml_solver == i] + self.suite_solver[i](inputs[use_ml_solver == i]).reshape((use_ml_solver == i).sum(), -1)
                         predictionsz[use_ml_solver == i] = u_new_i
                     else:
                         self.suite_solver[i].equation = equations
-                        u_new_i = self.suite_solver[i].iteration(u_prev, use_ml_solver == i)
-                        predictionsz = u_new_i
+                        mask_i = use_ml_solver == i
+                        u_new_i = self.suite_solver[i].iteration(u_prev, mask_i)
+                        # only overwrite the rows routed to this solver; assigning the
+                        # whole tensor would clobber updates from earlier solvers
+                        predictionsz[mask_i] = u_new_i[mask_i]
             if training:
                 all_expert_predictions = torch.stack(all_expert_predictions, dim=0)
                 # Zero center if it's periodic poisson to prevent constants from dominating the error

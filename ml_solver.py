@@ -1,5 +1,8 @@
 import torch
-from neuralop.models import FNO
+try:
+    from neuralop.models import FNO
+except ImportError:  # neuralop is only needed for FNOforPDE
+    FNO = None
 import models
 
 class MLSolver(torch.nn.Module):
@@ -144,6 +147,8 @@ class DeepONetCNN(MLSolver):
 class FNOforPDE(MLSolver):
     def __init__(self, trunc_mode, dim, N, in_channels=1, hidden_size = 32, num_layers = 2):
         super().__init__(dim, in_channels)
+        if FNO is None:
+            raise ImportError("FNOforPDE requires the 'neuralop' package")
         self.N = N
         self.fno = FNO(n_modes = (trunc_mode,)*dim,
                        in_channels = in_channels,
