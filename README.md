@@ -55,9 +55,11 @@ python finetune_deeponet_residual.py --equation EQ --N N --solver jacobi \
 # 3. train the lightweight router (imitates the cost-aware greedy oracle, DAgger)
 python router_lite.py --equation EQ --N N --solver jacobi
 
-# 4. benchmark wall-clock time-to-tolerance. For the tuned-HINTS comparison,
-#    sweep the period: --policies classical,oracle_ca,router,hints10,...,hints400
-#    and include the truncation-level tolerances (h^2, h^2/10) in --tols.
+# 4. benchmark wall-clock time-to-tolerance. The default comparison is against
+#    the published HINTS schedule (tau=25), as below. Do NOT run the full tau
+#    sweep by default -- it multiplies benchmark time ~6x and is only needed
+#    for the one-off tuned-HINTS robustness study (add hints10,...,hints400 to
+#    --policies for that study only; see run_phaseA_queue.sh / run_resume2.sh).
 python bench_wallclock.py --equation EQ --N N --solvers jacobi \
     --ckp checkpoints/fast_deeponet_EQ_N_ft_best.pth \
     --policies classical,oracle_ca,router,hints25 \
