@@ -93,7 +93,8 @@ def run_rollout(pde: FastStencilPDE, solver, f, u_truth, policy, corrector=None,
         t0 = time.perf_counter()
         r = pde.residual(u, f)
         rel_res = float(l2(r)[0]) / fn
-        t_cum += time.perf_counter() - t0
+        t_res_live = time.perf_counter() - t0
+        t_cum += t_res_live
 
         # ground-truth diagnostic (not charged)
         rel_err = float(l2(demean(u - u_truth))[0]) / un
@@ -120,28 +121,33 @@ def run_rollout(pde: FastStencilPDE, solver, f, u_truth, policy, corrector=None,
             raise ValueError(policy)
 
         if policy in ("oracle", "oracle_ca"):
-            t0 = time.perf_counter()
+            # The oracle's loop is not a deployable loop (it computes both
+            # candidates for its idealized decision), so live-timing any part
+            # of it is contaminated by the candidates' cache pressure (~30%
+            # inflation of a SOR step at 127^2, uniform across the run). It is
+            # therefore charged from the clean per-iteration arm constants
+            # measured under single-op loop conditions (op_costs = per-arm
+            # residual-inclusive costs from the bench warmup) -- iteration
+            # counts times deployed-op costs, the standard idealized-policy
+            # accounting. Live policies (classical/hints/router) keep live
+            # charging.
+            assert op_costs is not None, "oracle policies require op_costs"
             u_c = solver.step(u, f, r)
-            t_c = time.perf_counter() - t0
-            t0 = time.perf_counter()
             u_n = u + corrector.correct(r)
-            t_n = time.perf_counter() - t0
             e_c = float(l2(demean(u_c - u_truth))[0])
             e_n = float(l2(demean(u_n - u_truth))[0])
             if policy == "oracle":
                 pick_no = e_n < e_c
             else:
-                # error-reduction rate per unit time, with stable cost estimates
-                cc, cn = op_costs if op_costs is not None else (t_c, t_n)
+                cc, cn = op_costs
                 e_prev = float(l2(demean(u - u_truth))[0])
                 tiny = 1e-300
                 gain_c = np.log(max(e_prev, tiny) / max(e_c, tiny)) / cc
                 gain_n = np.log(max(e_prev, tiny) / max(e_n, tiny)) / cn
                 pick_no = gain_n > gain_c
-            if pick_no:
-                u, t_cum, decision = u_n, t_cum + t_n, 1
-            else:
-                u, t_cum, decision = u_c, t_cum + t_c, 0
+            u = u_n if pick_no else u_c
+            t_cum = t_cum - t_res_live + (op_costs[1] if pick_no else op_costs[0])
+            decision = 1 if pick_no else 0
         else:
             t0 = time.perf_counter()
             if decision == 1:

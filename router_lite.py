@@ -156,14 +156,13 @@ def collect_states(pde, solver, corrector, n_inst, op_costs, rng, max_roll=6000,
 
         u_c = solver.step(u, f, r)
         u_n = u + corrector.correct(r)
-        e_prev = l2(demean(u - u_star))
         e_c = l2(demean(u_c - u_star))
         e_n = l2(demean(u_n - u_star))
-        rate_c = np.log(np.maximum(e_prev, tiny) / np.maximum(e_c, tiny)) / cc
-        rate_n = np.log(np.maximum(e_prev, tiny) / np.maximum(e_n, tiny)) / cn
-        label = (rate_n > rate_c).astype(np.float64)
-        # relative regret: bounded and symmetric between go/stop mistakes
-        w = np.abs(rate_n - rate_c) / (np.maximum(np.abs(rate_n), np.abs(rate_c)) + 1e-12)
+        # Paper's greedy rule (Alg. 1): pick the op with the smaller next-step
+        # error; weight = bounded relative margin (monotone transform of the
+        # Eq. 10 surrogate weights, same Bayes decision, stable scale)
+        label = (e_n < e_c).astype(np.float64)
+        w = np.abs(e_c - e_n) / (np.maximum(e_c, e_n) + tiny)
 
         record = active & ((it < 300) | (it % 10 == 0))
         if record.any():

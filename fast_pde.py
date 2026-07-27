@@ -184,8 +184,39 @@ class FastSOR:
         return u + du.T.reshape(r.shape)
 
 
+class FastSSOR:
+    """Symmetric SOR: u <- u + M^{-1} (f - A u) with
+    M = (omega/(2-omega)) (D/omega + L) D^{-1} (D/omega + U); omega=1 is
+    symmetric Gauss-Seidel. Matches the (fixed) dense
+    SymmetricSuccessiveOverRelaxationSolver."""
+
+    def __init__(self, pde: FastStencilPDE, omega=1.0):
+        self.pde = pde
+        self.omega = omega
+        A = pde.sparse_A()
+        D = A.diagonal()
+        Dm = sp.diags(D / omega)
+        self._diag = D
+        self._lu_low = spla.splu((Dm + sp.tril(A, k=-1)).tocsc(), permc_spec="NATURAL")
+        self._lu_up = spla.splu((Dm + sp.triu(A, k=1)).tocsc(), permc_spec="NATURAL")
+        self._scale = (2.0 - omega) / omega
+        self.name = "ssor" if omega == 1.0 else f"ssor_{omega:g}"
+
+    def step(self, u, f, r=None):
+        if r is None:
+            r = self.pde.residual(u, f)
+        B = r.shape[0] if r.ndim == 3 else 1
+        N = self.pde.N
+        rr = np.ascontiguousarray(r.reshape(B, N * N).T)
+        y = self._lu_low.solve(rr)
+        y = self._diag[:, None] * y
+        y = self._lu_up.solve(np.ascontiguousarray(y))
+        return u + self._scale * y.T.reshape(r.shape)
+
+
 def make_solver(pde, spec):
-    """spec strings as used by train_router.py: jacobi, jacobi_0.67, gs, sor_1.5."""
+    """spec strings as used by train_router.py: jacobi, jacobi_0.67, gs,
+    sor_1.5, ssor (SymGS)."""
     parts = spec.split("_")
     if parts[0] == "jacobi":
         return FastJacobi(pde, float(parts[1]) if len(parts) > 1 else 1.0)
@@ -193,6 +224,8 @@ def make_solver(pde, spec):
         return FastGaussSeidel(pde)
     if parts[0] == "sor":
         return FastSOR(pde, float(parts[1]) if len(parts) > 1 else 1.0)
+    if parts[0] == "ssor":
+        return FastSSOR(pde, float(parts[1]) if len(parts) > 1 else 1.0)
     raise ValueError(f"unknown solver spec {spec}")
 
 

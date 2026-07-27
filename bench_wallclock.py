@@ -93,7 +93,17 @@ for spec in args.solvers.split(","):
     print(f"[{spec}] per-iteration cost: residual {t_res*1e6:.0f}us | classical arm "
           f"{t_classical*1e6:.0f}us | NO arm {t_no*1e6:.0f}us (ratio {t_no/t_classical:.1f}x)")
 
-    results[spec] = {"op_costs": {"classical": t_classical, "no": t_no, "residual": t_res}}
+    t_dec = 0.0
+    if router is not None:
+        router.reset()
+        reps_d = []
+        for _k in range(200):
+            t0 = time.perf_counter(); router.decide(r_w, 1e-3, _k, 0); reps_d.append(time.perf_counter() - t0)
+        t_dec = float(np.median(reps_d))
+        router.reset()
+        print(f"[{spec}] router decision cost: {t_dec*1e6:.1f}us")
+    results[spec] = {"op_costs": {"classical": t_classical, "no": t_no,
+                                  "residual": t_res, "router_decide": t_dec}}
     for policy in args.policies.split(","):
         rows = []
         t_start = time.time()
@@ -102,9 +112,16 @@ for spec in args.solvers.split(","):
                              corrector=corrector, router=router,
                              max_iters=args.max_iters, time_cap=args.time_cap,
                              res_floor=args.res_floor, op_costs=(t_classical, t_no))
+            cum_no = (tr["decision"] == 1).cumsum()
+            def _no_at(tup):
+                i = tup[1]
+                return int(cum_no[min(int(i), len(cum_no) - 1)]) if np.isfinite(i) else "inf"
+            err_t = {str(t): time_to_tol(tr, [t], "rel_err")[t] for t in tols}
+            res_t = {str(t): time_to_tol(tr, [t], "rel_res")[t] for t in tols}
             rows.append({
-                "res": {str(t): time_to_tol(tr, [t], "rel_res")[t] for t in tols},
-                "err": {str(t): time_to_tol(tr, [t], "rel_err")[t] for t in tols},
+                "res": res_t,
+                "err": err_t,
+                "err_no_at": {k: _no_at(v) for k, v in err_t.items()},
                 "n_iters": int(len(tr["decision"])),
                 "n_no_calls": int((tr["decision"] == 1).sum()),
                 "final_rel_res": float(tr["rel_res"][-1]),

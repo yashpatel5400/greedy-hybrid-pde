@@ -33,6 +33,10 @@ parser.add_argument("--solver", type=str, default="jacobi")
 parser.add_argument("--n_col", type=int, default=512, help="instances for residual collection")
 parser.add_argument("--rollout_iters", type=int, default=400)
 parser.add_argument("--p_no", type=float, default=0.25, help="explore prob of NO call")
+parser.add_argument("--collect_policy", type=str, default="random",
+                    choices=["random", "oracle"],
+                    help="advance rollouts randomly (p_no) or with the paper's "
+                         "pure error-greedy oracle (+ p_no exploration)")
 parser.add_argument("--n_orig", type=int, default=8000, help="original f->u pairs kept in the mix")
 parser.add_argument("--epochs", type=int, default=120)
 parser.add_argument("--batch_size", type=int, default=256)
@@ -46,6 +50,9 @@ args = parser.parse_args()
 rng = np.random.default_rng(args.seed)
 torch.manual_seed(args.seed)
 base_tag = f"fast_deeponet_{args.equation}_{args.N}"
+# per-pairing fine-tunes get solver-tagged checkpoints (jacobi keeps the
+# legacy untagged name for backwards compatibility)
+out_tag = base_tag + ("_ft" if args.solver == "jacobi" else f"_ft_{args.solver}")
 pde = FastStencilPDE(args.N, equation=args.equation, b_vec=(args.b_vel, args.b_vel))
 solver = make_solver(pde, args.solver)
 corr = DeepONetCorrector(f"{args.ckp_dir}/{base_tag}_best.pth", threads=8)
@@ -73,18 +80,33 @@ X, Y = [], []
 u = np.zeros_like(f_col)
 for it in range(1, args.rollout_iters + 1):
     r = pde.residual(u, f_col)
-    pick_no = rng.random(args.n_col) < args.p_no
-    if pick_no.any():
-        u[pick_no] = u[pick_no] + corr.correct(r[pick_no])
-    if (~pick_no).any():
-        u[~pick_no] = solver.step(u[~pick_no], f_col[~pick_no], r[~pick_no])
+    if args.collect_policy == "oracle":
+        # advance with the paper's pure error-greedy (Alg. 1), with p_no
+        # exploration so nearby off-policy states are also covered
+        u_c = solver.step(u, f_col, r)
+        u_n = u + corr.correct(r)
+        e_c = l2(demean(u_c - u_star))
+        e_n = l2(demean(u_n - u_star))
+        pick_no = (e_n < e_c)
+        flip = rng.random(args.n_col) < args.p_no
+        pick_no = np.where(flip, ~pick_no, pick_no)
+        u = np.where(pick_no[:, None, None], u_n, u_c)
+    else:
+        pick_no = rng.random(args.n_col) < args.p_no
+        if pick_no.any():
+            u[pick_no] = u[pick_no] + corr.correct(r[pick_no])
+        if (~pick_no).any():
+            u[~pick_no] = solver.step(u[~pick_no], f_col[~pick_no], r[~pick_no])
     if it in snap_iters:
         r_now = pde.residual(u, f_col)
         e_now = demean(u_star - u)
         rn = l2(r_now)[:, None, None]
         keep = (rn[:, 0, 0] > 1e-13 * l2(f_col))  # skip converged instances
-        X.append((r_now[keep] / rn[keep]).reshape(keep.sum(), -1).astype(np.float32))
-        Y.append((e_now[keep] / rn[keep] * target_scale).reshape(keep.sum(), -1).astype(np.float32))
+        if keep.any():
+            X.append((r_now[keep] / rn[keep]).reshape(int(keep.sum()), -1).astype(np.float32))
+            Y.append((e_now[keep] / rn[keep] * target_scale).reshape(int(keep.sum()), -1).astype(np.float32))
+        else:
+            break  # every instance converged; later snapshots are empty too
 X = np.concatenate(X)
 Y = np.concatenate(Y)
 print(f"  collected {len(X)} residual pairs in {time.time()-t0:.0f}s")
@@ -151,10 +173,10 @@ for ep in range(args.epochs):
         if v < best:
             best = v
             torch.save({"model": model.state_dict(), "args": a, "target_scale": target_scale},
-                       f"{args.ckp_dir}/{base_tag}_ft_best.pth")
+                       f"{args.ckp_dir}/{out_tag}_best.pth")
             mark = " *"
         print(f"  ep {ep:4d} val_relL2(mixed) {v:.4f}{mark}", flush=True)
 
-with open(f"{args.ckp_dir}/{base_tag}_ft_meta.json", "w") as fh:
+with open(f"{args.ckp_dir}/{out_tag}_meta.json", "w") as fh:
     json.dump({"best_val_median_relL2": best, "n_residual_pairs": int(len(X)), **vars(args)}, fh, indent=1)
-print(f"[{base_tag}_ft] done, best mixed val rel L2 {best:.4f}")
+print(f"[{out_tag}] done, best mixed val rel L2 {best:.4f}")
