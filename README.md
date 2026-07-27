@@ -45,23 +45,39 @@ Pipeline for one setting (equation `EQ` in `Poisson/ConvDiff`, grid size `N` in 
 # 1. train the corrector (FFT-generated ground truth, scale-equivariant)
 python train_fast_deeponet.py --equation EQ --N N --epochs 250
 
-# 2. fine-tune it on the residual distribution seen inside hybrid solves
-python finetune_deeponet_residual.py --equation EQ --N N --solver jacobi
+# 2. fine-tune it on the residual distribution seen inside hybrid solves.
+#    IMPORTANT: scale --rollout_iters with the grid so the collected states
+#    cover the full deployment trajectory (the default 400 is only adequate
+#    for N=31): we use 3000 at N=63, 1600 at N=127, 2400 at N=191.
+python finetune_deeponet_residual.py --equation EQ --N N --solver jacobi \
+    --rollout_iters R
 
 # 3. train the lightweight router (imitates the cost-aware greedy oracle, DAgger)
 python router_lite.py --equation EQ --N N --solver jacobi
 
-# 4. benchmark wall-clock time-to-tolerance
+# 4. benchmark wall-clock time-to-tolerance. For the tuned-HINTS comparison,
+#    sweep the period: --policies classical,oracle_ca,router,hints10,...,hints400
+#    and include the truncation-level tolerances (h^2, h^2/10) in --tols.
 python bench_wallclock.py --equation EQ --N N --solvers jacobi \
     --ckp checkpoints/fast_deeponet_EQ_N_ft_best.pth \
-    --policies classical,oracle_ca,router,hints25
+    --policies classical,oracle_ca,router,hints25 \
+    --out_dir results_wallclock
 
-# 5. regenerate the LaTeX tables used by the paper
+# 5. conservative margins vs tuned HINTS (worst tau, censoring-aware, bootstrap
+#    CIs) and corrector floor diagnostics (untimed; uses a validation seed)
+python analyze_margins.py --pattern "results_wallclock_ph1/*.json" --ours oracle_ca
+python fast_floor_diag.py --equation EQ --N N --ckps checkpoints/..._ft_best.pth
+
+# 6. regenerate the LaTeX tables used by the paper
 python gen_wallclock_tables.py
 ```
 
-`run_deeponet_queue.sh`, `run_ft_queue.sh`, `run_router_queue.sh`, and
-`run_bench_queue.sh` reproduce every setting reported in the paper.
+Reproduction scripts: `run_deeponet_queue.sh`, `run_ft_queue.sh`,
+`run_router_queue.sh`, `run_bench_queue.sh` (first-round tables in
+`results_wallclock/`); `run_phaseA_queue.sh` and `run_resume2.sh`
+(tuned-HINTS tau-sweep study in `results_wallclock_ph1/`, using the
+grid-scaled fine-tunes and the calibrated per-iteration op costs).
+Timing runs must be executed sequentially on an otherwise idle machine.
 
 ### Size of solver ensembles
 Train routers for `equation` = `Poisson` and `Helmholtz` for the following list of solver ensembles:
