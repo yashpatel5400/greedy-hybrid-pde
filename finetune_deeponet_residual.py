@@ -53,8 +53,14 @@ ckp = torch.load(f"{args.ckp_dir}/{base_tag}_best.pth", map_location="cpu", weig
 target_scale = ckp["target_scale"]
 
 # ---------------------------------------------------------------- collection
+# log-spaced snapshots covering the whole rollout (early phase densely, late
+# phase sparsely) so the corrector sees the full residual distribution that a
+# deployed hybrid solve visits -- at fine grids trajectories run into the
+# thousands of iterations and the late-phase states matter
 snap_iters = sorted(set(
-    list(range(1, 12)) + [15, 20, 27, 36, 48, 64, 85, 113, 150, 200, 266, 350]))
+    list(range(1, 12)) +
+    np.unique(np.round(np.geomspace(12, max(args.rollout_iters, 13),
+                                    24)).astype(int)).tolist()))
 snap_iters = [s for s in snap_iters if s <= args.rollout_iters]
 print(f"collecting residuals: {args.n_col} instances x {len(snap_iters)} snapshots "
       f"(explore p_no={args.p_no})")

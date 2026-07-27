@@ -74,20 +74,26 @@ for spec in args.solvers.split(","):
     solver = make_solver(pde, spec)
     _ = solver.step(np.zeros_like(f_test[:1]), f_test[:1])  # warm splu path
 
-    # stable per-op cost estimates for the cost-aware policies
+    # Stable per-ITERATION cost estimates for the cost-aware policies, measured
+    # at the same boundaries run_rollout charges: every iteration pays the
+    # residual (needed by both arms and the stopping test) plus the chosen
+    # update, where the classical step receives the precomputed residual.
+    # (Measuring solver.step without r would double-count the residual in the
+    # classical arm's cost and mis-calibrate the greedy rate rule.)
     u_w = np.zeros_like(f_test[:1])
-    reps = []
-    for _k in range(25):
-        t0 = time.perf_counter(); _ = solver.step(u_w, f_test[:1]); reps.append(time.perf_counter() - t0)
-    t_classical = float(np.median(reps))
-    reps = []
-    for _k in range(25):
-        t0 = time.perf_counter(); _ = corrector.correct(f_test[:1]); reps.append(time.perf_counter() - t0)
-    t_no = float(np.median(reps))
-    print(f"[{spec}] per-op cost: classical {t_classical*1e6:.0f}us, NO {t_no*1e6:.0f}us "
-          f"(ratio {t_no/t_classical:.1f}x)")
+    r_w = pde.residual(u_w, f_test[:1])
+    reps_r, reps_c, reps_n = [], [], []
+    for _k in range(40):
+        t0 = time.perf_counter(); r_w = pde.residual(u_w, f_test[:1]); reps_r.append(time.perf_counter() - t0)
+        t0 = time.perf_counter(); _ = solver.step(u_w, f_test[:1], r_w); reps_c.append(time.perf_counter() - t0)
+        t0 = time.perf_counter(); _ = u_w + corrector.correct(r_w); reps_n.append(time.perf_counter() - t0)
+    t_res = float(np.median(reps_r))
+    t_classical = t_res + float(np.median(reps_c))
+    t_no = t_res + float(np.median(reps_n))
+    print(f"[{spec}] per-iteration cost: residual {t_res*1e6:.0f}us | classical arm "
+          f"{t_classical*1e6:.0f}us | NO arm {t_no*1e6:.0f}us (ratio {t_no/t_classical:.1f}x)")
 
-    results[spec] = {"op_costs": {"classical": t_classical, "no": t_no}}
+    results[spec] = {"op_costs": {"classical": t_classical, "no": t_no, "residual": t_res}}
     for policy in args.policies.split(","):
         rows = []
         t_start = time.time()

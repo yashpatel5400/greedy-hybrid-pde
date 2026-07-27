@@ -224,15 +224,21 @@ def fit(equation, N, solver_spec, ckp_path, n_inst=192, max_roll=6000, b_vel=20.
     solver = make_solver(pde, solver_spec)
     corr = DeepONetCorrector(ckp_path, threads=8)
 
+    # per-ITERATION arm costs at the boundaries run_rollout charges (residual is
+    # paid every iteration by both arms; classical step gets the precomputed r)
     warm = np.zeros((1, N, N))
     fwarm = GRF2D(N, rng=np.random.default_rng(1)).sample(1)
-    _ = solver.step(warm, fwarm); _ = corr.correct(fwarm)
-    reps_c, reps_n = [], []
-    for _k in range(25):
-        t0 = time.perf_counter(); _ = solver.step(warm, fwarm); reps_c.append(time.perf_counter() - t0)
-        t0 = time.perf_counter(); _ = corr.correct(fwarm); reps_n.append(time.perf_counter() - t0)
-    costs = (float(np.median(reps_c)), float(np.median(reps_n)))
-    print(f"op costs: classical {costs[0]*1e6:.0f}us NO {costs[1]*1e6:.0f}us")
+    rwarm = pde.residual(warm, fwarm)
+    _ = solver.step(warm, fwarm, rwarm); _ = corr.correct(rwarm)
+    reps_r, reps_c, reps_n = [], [], []
+    for _k in range(40):
+        t0 = time.perf_counter(); rwarm = pde.residual(warm, fwarm); reps_r.append(time.perf_counter() - t0)
+        t0 = time.perf_counter(); _ = solver.step(warm, fwarm, rwarm); reps_c.append(time.perf_counter() - t0)
+        t0 = time.perf_counter(); _ = warm + corr.correct(rwarm); reps_n.append(time.perf_counter() - t0)
+    t_res = float(np.median(reps_r))
+    costs = (t_res + float(np.median(reps_c)), t_res + float(np.median(reps_n)))
+    print(f"per-iteration arm costs: classical {costs[0]*1e6:.0f}us NO {costs[1]*1e6:.0f}us "
+          f"(residual {t_res*1e6:.0f}us)")
 
     rng = np.random.default_rng(seed)
     t0 = time.time()
