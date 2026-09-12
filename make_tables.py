@@ -38,6 +38,8 @@ def load(pattern=None):
     for path in sorted(glob.glob(pattern)):
         d = json.load(open(path))
         a = d["args"]
+        if "ensemble" not in a:  # usage_*.json (decision traces), not benchmark output
+            continue
         for gkey, g in d["groups"].items():
             R[(a["equation"], a["N"], gkey, bool(a["ensemble"]))] = (d, g)
     return R
@@ -324,6 +326,7 @@ def main():
 
     # ------------------------------------------------------------- ensembles
     ens_keys = [k for k in R if k[3]]
+    ens_ratios, ens_vs_solver = [], []
     if not ens_keys:
         out.append("\\newcommand{\\caens}{\\begin{tabular}{c}(ensemble results pending)\\end{tabular}}")
         out.append("\\newcommand{\\caensusage}{\\begin{tabular}{c}(ensemble results pending)\\end{tabular}}")
@@ -361,6 +364,8 @@ def main():
                 t_pw = times(pw_rows, pw_key)
                 t_ens = times(P["router"], key)
                 sp_pw, _ = paired_speedup(t_pw, t_ens)
+                ens_ratios.append(np.median(t_pw) / np.median(t_ens))
+                ens_vs_solver.append(cls[bc] / np.median(t_ens))
                 wname = "\\{" + ", ".join(SOLVER_NAMES[s] for s in members) + "\\}"
                 row = [eq if first else "", f"${wname}$",
                        f"{fmt_time(cls[bc])} ({bc_name})",
@@ -433,6 +438,13 @@ def main():
     out.append(f"\\newcommand{{\\caNumCells}}{{{n_cells}}}")
     out.append(f"\\newcommand{{\\caCellsRouterBeatsBest}}{{{sum(v >= 1.0 for v in summ['Best'])}}}")
     out.append(f"\\newcommand{{\\caCellsRouterBeatsHints}}{{{sum(v >= 1.0 for v in summ['Hints'])}}}")
+
+    if ens_ratios:
+        out.append(f"\\newcommand{{\\caEnsVsPairMin}}{{{fmt_sp(min(ens_ratios))}}}")
+        out.append(f"\\newcommand{{\\caEnsVsPairMax}}{{{fmt_sp(max(ens_ratios))}}}")
+        out.append(f"\\newcommand{{\\caEnsVsSolverMin}}{{{fmt_sp(min(ens_vs_solver))}}}")
+        out.append(f"\\newcommand{{\\caEnsVsSolverMax}}{{{fmt_sp(max(ens_vs_solver))}}}")
+        out.append(f"\\newcommand{{\\caNumEns}}{{{len(ens_ratios)}}}")
 
     os.makedirs("paper", exist_ok=True)
     with open(OUT_TEX, "w") as fh:

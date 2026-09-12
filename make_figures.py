@@ -36,6 +36,8 @@ def load():
     for path in sorted(glob.glob(f"{RESULTS_DIR}/*.json")):
         d = json.load(open(path))
         a = d["args"]
+        if "ensemble" not in a:  # usage_*.json (decision traces), not benchmark output
+            continue
         for gkey, g in d["groups"].items():
             R[(a["equation"], a["N"], gkey, bool(a["ensemble"]))] = (d, g)
     return R
