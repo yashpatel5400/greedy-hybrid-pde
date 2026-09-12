@@ -40,9 +40,9 @@ def load(pattern=None):
     R = {}
     for path in sorted(glob.glob(pattern)):
         d = json.load(open(path))
-        a = d["args"]
-        if "ensemble" not in a:  # usage_*.json (decision traces), not benchmark output
+        if "args" not in d or "ensemble" not in d["args"]:  # usage/seeds/overheads files, not benchmark output
             continue
+        a = d["args"]
         for gkey, g in d["groups"].items():
             R[(a["equation"], a["N"], gkey, bool(a["ensemble"]))] = (d, g)
     return R
@@ -655,7 +655,7 @@ def main():
     out.append("\\begin{tabular}{llcccccccc}\n\\toprule")
     out.append("& & \\multicolumn{3}{c}{$\\varepsilon = h^2$: $p$ (Wilcoxon / $t$)} & \\multicolumn{2}{c}{$\\varepsilon = 10^{-8}$: $p$} & \\multicolumn{3}{c}{Router over 5 training seeds} \\\\")
     out.append("\\cmidrule(lr){3-5}\\cmidrule(lr){6-7}\\cmidrule(lr){8-10}")
-    out.append("Equation & Solver & vs.\\ solver only & vs.\\ HINTS-25 & vs.\\ best $\\tau$ & vs.\\ HINTS-25 & vs.\\ best $\\tau$ & time to $h^2$ & speedup vs.\\ HINTS-25 & seeds with $p{<}0.01$ \\\\ \\midrule")
+    out.append("Equation & Solver & vs.\\ solver only & vs.\\ HINTS-25 & vs.\\ best $\\tau$ & vs.\\ HINTS-25 & vs.\\ best $\\tau$ & time to $h^2$ (decisions as main router) & speedup vs.\\ HINTS-25 & seeds with $p{<}0.01$ \\\\ \\midrule")
     for eq in EQS:
         first = True
         for spec in SOLVER_ORDER:
@@ -677,17 +677,23 @@ def main():
                 cells.append(f"{pstr(wilcoxon_p(times(P[bt], key), t_r))} / {pstr(ttest_p(times(P[bt], key), t_r))}")
             # seeds
             sd = Sf.get((eq, keys[0][1]))
-            if sd and spec in sd["groups"] and sd["groups"][spec]:
+            if sd and spec in sd["groups"] and sd["groups"][spec] and all("t_wu" in blk["rows"][0]["tol"][tkey(d, d["h2"])] for blk in sd["groups"][spec].values()):
+                # timer-free (work-unit) comparison: seed trials run in separate sessions, so
+                # live times are not comparable; decisions and work units are
                 key = tkey(d, d["h2"])
-                th = times(P["hints25"], key)
-                meds, sps, nsig = [], [], 0
+                th = times(P["hints25"], key, field="t_wu")
+                tb = times(P[min(taus, key=lambda p_: np.median(times(P[p_], key)))], key, field="t_wu")
+                it_main = iters(P["router"], key)
+                meds, sps, nsig, agree = [], [], 0, []
                 for s_, blk in sd["groups"][spec].items():
-                    tr_ = np.array([np.inf if r["tol"][key]["t_live"] is None else r["tol"][key]["t_live"] for r in blk["rows"]])
+                    tr_ = np.array([np.inf if r["tol"][key]["t_wu"] is None else r["tol"][key]["t_wu"] for r in blk["rows"]])
+                    it_s = np.array([np.inf if r["tol"][key]["iters"] is None else r["tol"][key]["iters"] for r in blk["rows"]])
                     meds.append(np.median(tr_))
                     sps.append(paired_speedup(th, tr_)[0])
-                    if wilcoxon_p(th, tr_) < 0.01 and wilcoxon_p(times(P[min(taus, key=lambda p_: np.median(times(P[p_], key)))], key), tr_) < 0.01:
+                    agree.append(float(np.mean(it_s == it_main)))
+                    if wilcoxon_p(th, tr_) < 0.01 and wilcoxon_p(tb, tr_) < 0.01:
                         nsig += 1
-                cells += [f"{np.mean(meds)*1e3:.2f} $\\pm$ {np.std(meds)*1e3:.2f}\\,ms",
+                cells += [f"{np.mean(meds)*1e3:.2f} $\\pm$ {np.std(meds)*1e3:.2f}\\,ms ({100*np.mean(agree):.0f}\\%)",
                           f"{min(sps):.2f}--{max(sps):.2f}$\\times$", f"{nsig}/{len(meds)}"]
             else:
                 cells += ["--", "--", "--"]

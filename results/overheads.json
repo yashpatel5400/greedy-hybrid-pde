@@ -1,0 +1,206 @@
+{
+ "per_op": {
+  "32": {
+   "residual": 1.31875e-05,
+   "jacobi": 1.3895500000000001e-05,
+   "gs": 2.52915e-05,
+   "ssor": 3.84165e-05,
+   "mg": 4.1917000000000005e-05,
+   "fft": 4.05205e-05,
+   "router_decision": 4.9170000000000005e-06,
+   "lstm_router_decision": 0.0002355
+  },
+  "64": {
+   "residual": 2.3125000000000003e-05,
+   "jacobi": 2.5417000000000004e-05,
+   "gs": 6.3979e-05,
+   "ssor": 0.00010937500000000002,
+   "mg": 0.0003895,
+   "fft": 7.710450000000001e-05,
+   "router_decision": 5.0410000000000005e-06,
+   "lstm_router_decision": 0.0006960625000000001
+  },
+  "128": {
+   "residual": 4.7083e-05,
+   "jacobi": 5.26665e-05,
+   "gs": 0.00020852050000000002,
+   "ssor": 0.0003783745,
+   "mg": 0.0013468330000000002,
+   "fft": 0.000268458,
+   "corrector": 0.0006628335,
+   "corrector_n_c": 64,
+   "router_decision": 5e-06,
+   "lstm_router_decision": 0.0024290835
+  },
+  "256": {
+   "residual": 0.00017062500000000001,
+   "jacobi": 0.000190709,
+   "gs": 0.0008198955,
+   "ssor": 0.0014753750000000001,
+   "mg": 0.005267875,
+   "fft": 0.001209521,
+   "corrector": 0.001127146,
+   "corrector_n_c": 64,
+   "router_decision": 5e-06,
+   "lstm_router_decision": 0.0095499585
+  },
+  "512": {
+   "residual": 0.0009376665,
+   "jacobi": 0.0010696665,
+   "gs": 0.0037430835,
+   "ssor": 0.0068487705,
+   "mg": 0.025352562000000002,
+   "fft": 0.0064682915,
+   "corrector": 0.0036225205,
+   "corrector_n_c": 64,
+   "router_decision": 5.125e-06,
+   "lstm_router_decision": 0.037459874500000004
+  }
+ },
+ "training": {
+  "corrector_ConvDiff_128": {
+   "data_s": 70.9,
+   "fit_s": 8.0
+  },
+  "corrector_Poisson_128": {
+   "data_s": 74.1,
+   "fit_s": 8.0
+  },
+  "corrector_Poisson_512": {
+   "data_s": 500.4,
+   "fit_s": 4.0
+  },
+  "corrector_ConvDiff_512": {
+   "data_s": 487.6,
+   "fit_s": 5.0
+  },
+  "corrector_Poisson_256": {
+   "data_s": 94.1,
+   "fit_s": 4.0
+  },
+  "corrector_ConvDiff_256": {
+   "data_s": 102.4,
+   "fit_s": 4.0
+  },
+  "router_ConvDiff_128_jacobi+gs+ssor+jacobi_0.67": {
+   "train_s": 3192.0
+  },
+  "router_Poisson_128_jacobi": {
+   "train_s": 395.0
+  },
+  "router_Poisson_128_jacobi_0.67": {
+   "train_s": 3.0
+  },
+  "router_Poisson_128_gs": {
+   "train_s": 8.0
+  },
+  "router_Poisson_128_ssor": {
+   "train_s": 8.0
+  },
+  "router_Poisson_128_sor_1.5": {
+   "train_s": 14.0
+  },
+  "router_Poisson_128_mg": {
+   "train_s": 11.0
+  },
+  "router_Poisson_512_jacobi": {
+   "train_s": 314.0
+  },
+  "router_Poisson_512_gs": {
+   "train_s": 229.0
+  },
+  "router_Poisson_512_sor_1.5": {
+   "train_s": 113.0
+  },
+  "router_Poisson_512_mg": {
+   "train_s": 45.0
+  },
+  "router_ConvDiff_128_jacobi": {
+   "train_s": 600.0
+  },
+  "router_ConvDiff_128_jacobi_0.67": {
+   "train_s": 4.0
+  },
+  "router_ConvDiff_128_gs": {
+   "train_s": 8.0
+  },
+  "router_ConvDiff_128_ssor": {
+   "train_s": 8.0
+  },
+  "router_ConvDiff_128_sor_1.5": {
+   "train_s": 12.0
+  },
+  "router_ConvDiff_128_mg": {
+   "train_s": 12.0
+  },
+  "router_Poisson_128_jacobi+gs+ssor+jacobi_0.67": {
+   "train_s": 581.0
+  },
+  "router_Poisson_128_jacobi+gs+ssor": {
+   "train_s": 63.0
+  },
+  "router_ConvDiff_512_jacobi": {
+   "train_s": 380.0
+  },
+  "router_ConvDiff_512_gs": {
+   "train_s": 254.0
+  },
+  "router_ConvDiff_512_sor_1.5": {
+   "train_s": 128.0
+  },
+  "router_ConvDiff_512_mg": {
+   "train_s": 49.0
+  },
+  "router_ConvDiff_128_jacobi+gs+ssor": {
+   "train_s": 64.0
+  },
+  "router_ConvDiff_128_jacobi+gs+ssor+jacobi_0.67+sor_1.5": {
+   "train_s": 1582.0
+  },
+  "router_ConvDiff_128_jacobi+gs": {
+   "train_s": 49.0
+  },
+  "router_Poisson_128_jacobi+gs+ssor+jacobi_0.67+sor_1.5": {
+   "train_s": 69.0
+  },
+  "router_Poisson_256_jacobi": {
+   "train_s": 906.0
+  },
+  "router_Poisson_256_jacobi_0.67": {
+   "train_s": 92.0
+  },
+  "router_Poisson_256_gs": {
+   "train_s": 34.0
+  },
+  "router_Poisson_256_ssor": {
+   "train_s": 27.0
+  },
+  "router_Poisson_256_sor_1.5": {
+   "train_s": 33.0
+  },
+  "router_Poisson_256_mg": {
+   "train_s": 17.0
+  },
+  "router_Poisson_128_jacobi+gs": {
+   "train_s": 58.0
+  },
+  "router_ConvDiff_256_jacobi": {
+   "train_s": 872.0
+  },
+  "router_ConvDiff_256_jacobi_0.67": {
+   "train_s": 63.0
+  },
+  "router_ConvDiff_256_gs": {
+   "train_s": 33.0
+  },
+  "router_ConvDiff_256_ssor": {
+   "train_s": 29.0
+  },
+  "router_ConvDiff_256_sor_1.5": {
+   "train_s": 34.0
+  },
+  "router_ConvDiff_256_mg": {
+   "train_s": 18.0
+  }
+ }
+}

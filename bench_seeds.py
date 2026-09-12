@@ -17,7 +17,7 @@ import torch
 
 from fast_pde import FastStencilPDE, GRF2D
 from corrector import DeepONetCorrector
-from hybrid import Env, FeatureState, run_untimed, run_timed, time_to_tol
+from hybrid import Env, FeatureState, run_untimed, run_timed, time_to_tol, work_units
 from router import fit_router
 
 p = argparse.ArgumentParser()
@@ -69,9 +69,12 @@ for spec in args.solvers.split(","):
             t, _ = run_timed(env, f1, tr, "router", router=router)
             gc.enable()
             tt = time_to_tol(tr, t, tols)
+            t_wu = work_units(env, tr, "router", router_cost=5e-6)
+            tw = time_to_tol(tr, t_wu, tols)
             rows.append({"n_ops": int(len(tr["op"])), "n_no": int(tr["n_no"]),
                          "tol": {f"{tol:.6g}": {"iters": None if not np.isfinite(tt[tol][1]) else int(tt[tol][1]),
-                                                "t_live": None if not np.isfinite(tt[tol][0]) else float(tt[tol][0])}
+                                                "t_live": None if not np.isfinite(tt[tol][0]) else float(tt[tol][0]),
+                                                "t_wu": None if not np.isfinite(tw[tol][0]) else float(tw[tol][0])}
                                  for tol in tols}})
         res["groups"][spec][str(sd)] = {"train_s": train_s, "rows": rows}
         med = np.median([r["tol"][f"{h2:.6g}"]["t_live"] or np.inf for r in rows])

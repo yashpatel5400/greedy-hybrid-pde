@@ -749,12 +749,41 @@ ConvDiff, GS & $128^2$ & 1.63\,s & 8.27\,ms (6.76$\times$) & 3.60\,ms (2.60$\tim
 \midrule
 \bottomrule
 \end{tabular}}
+\newcommand{\caoverheads}{
+\begin{tabular}{lccccc}
+\toprule
+Operation & $N=32$ & $N=64$ & $N=128$ & $N=256$ & $N=512$ \\ \midrule
+Jacobi iteration & 14\,$\mu$s & 25\,$\mu$s & 53\,$\mu$s & 191\,$\mu$s & 1.07\,ms \\
+GS iteration & 25\,$\mu$s & 64\,$\mu$s & 209\,$\mu$s & 820\,$\mu$s & 3.74\,ms \\
+SymGS iteration & 38\,$\mu$s & 109\,$\mu$s & 378\,$\mu$s & 1.48\,ms & 6.85\,ms \\
+Multigrid V(2,2) cycle & -- & 390\,$\mu$s & 1.35\,ms & 5.27\,ms & 25.35\,ms \\
+FFT direct solve & 41\,$\mu$s & 77\,$\mu$s & 268\,$\mu$s & 1.21\,ms & 6.47\,ms \\
+DeepONet corrector call & -- & -- & 663\,$\mu$s & 1.13\,ms & 3.62\,ms \\
+Router decision (ours) & 5\,$\mu$s & 5\,$\mu$s & 5\,$\mu$s & 5\,$\mu$s & 5\,$\mu$s \\
+LSTM router decision (\Cref{sec:experiments}) & 236\,$\mu$s & 696\,$\mu$s & 2.43\,ms & 9.55\,ms & 37.46\,ms \\
+\bottomrule
+\end{tabular}}
+\newcommand{\caamort}{
+\begin{tabular}{llccccc}
+\toprule
+Equation & $N$ & Corrector data + fit & Router training (GS pairing) & Saving per solve vs HINTS ($\tau{=}25$) & Break-even solves (router) & Saving per solve vs solver only \\ \midrule
+Poisson & $128^2$ & 82\,s & 8\,s & 5.64\,ms & 1419 & 1.83\,s \\
+ & $256^2$ & 98\,s & 34\,s & 18.1\,ms & 1883 & 28.82\,s \\
+ & $512^2$ & 504\,s & 229\,s & 11.4\,ms & 20139 & -- \\
+\midrule
+ConvDiff & $128^2$ & 79\,s & 8\,s & 6.92\,ms & 1157 & 1.63\,s \\
+ & $256^2$ & 106\,s & 33\,s & 24.0\,ms & 1376 & 30.05\,s \\
+ & $512^2$ & 493\,s & 254\,s & 34.2\,ms & 7423 & -- \\
+\bottomrule
+\end{tabular}}
+\newcommand{\caLstmOverJacobi}{46}
+\newcommand{\caLstmMs}{2.4}
 \newcommand{\castats}{
 \begin{tabular}{llcccccccc}
 \toprule
 & & \multicolumn{3}{c}{$\varepsilon = h^2$: $p$ (Wilcoxon / $t$)} & \multicolumn{2}{c}{$\varepsilon = 10^{-8}$: $p$} & \multicolumn{3}{c}{Router over 5 training seeds} \\
 \cmidrule(lr){3-5}\cmidrule(lr){6-7}\cmidrule(lr){8-10}
-Equation & Solver & vs.\ solver only & vs.\ HINTS-25 & vs.\ best $\tau$ & vs.\ HINTS-25 & vs.\ best $\tau$ & time to $h^2$ & speedup vs.\ HINTS-25 & seeds with $p{<}0.01$ \\ \midrule
+Equation & Solver & vs.\ solver only & vs.\ HINTS-25 & vs.\ best $\tau$ & vs.\ HINTS-25 & vs.\ best $\tau$ & time to $h^2$ (decisions as main router) & speedup vs.\ HINTS-25 & seeds with $p{<}0.01$ \\ \midrule
 Poisson & Jacobi & $<10^{-10}$ / $<10^{-10}$ & $<10^{-10}$ / $<10^{-10}$ & $10^{-8}$ / $10^{-7}$ & $<10^{-10}$ / $<10^{-10}$ & $10^{-9}$ / $10^{-8}$ & -- & -- & -- \\
  & Jacobi (0.67) & $<10^{-10}$ / $<10^{-10}$ & $<10^{-10}$ / $<10^{-10}$ & $10^{-9}$ / $<10^{-10}$ & $<10^{-10}$ / $<10^{-10}$ & $10^{-4}$ / $10^{-5}$ & -- & -- & -- \\
  & GS & $<10^{-10}$ / $<10^{-10}$ & $<10^{-10}$ / $<10^{-10}$ & $<10^{-10}$ / $<10^{-10}$ & $<10^{-10}$ / $<10^{-10}$ & $10^{-10}$ / $<10^{-10}$ & -- & -- & -- \\
@@ -831,10 +860,6 @@ Poisson $512^2$ & FFT direct solve & 0.353 & slower: $10^{-4}$ & slower: $10^{-5
 \newcommand{\caFftRatioMax}{2.91$\times$}
 \newcommand{\caVsMgEnsMin}{1.93$\times$}
 \newcommand{\caVsMgEnsMax}{2.03$\times$}
-\newcommand{\caoverheads}{\begin{tabular}{c}(results pending)\end{tabular}}
-\newcommand{\caamort}{\begin{tabular}{c}(results pending)\end{tabular}}
-\newcommand{\caLstmMs}{--}
-\newcommand{\caLstmOverJacobi}{--}
 \newcommand{\caEnsVsPairMin}{0.82$\times$}
 \newcommand{\caEnsVsPairMax}{1.14$\times$}
 \newcommand{\caEnsVsSolverMin}{380$\times$}
