@@ -501,6 +501,8 @@ def main():
             ref = times(pw[best_s][1]["policies"]["router"], tkey(pw[best_s][0], d["h2"])) if best_s else None
             first = True
             for m in d["methods"]:
+                if not d["methods"][m]:
+                    continue
                 cells = [med_str(base_times(d, m, t), ref) for t in tl]
                 its = base_iters(d, m, d["h2"])
                 cells.append(f"{np.median(its):.0f}" if np.isfinite(np.median(its)) else "--")
@@ -737,6 +739,8 @@ def main():
         dd, g = pw[best_s]
         first = True
         for m in d["methods"]:
+            if not d["methods"][m]:
+                continue
             cells = []
             for tol in [1e-3, d["h2"], 1e-6, 1e-8]:
                 t_r = times(g["policies"]["router"], tkey(dd, tol))
