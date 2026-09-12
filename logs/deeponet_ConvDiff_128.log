@@ -1,5 +1,0 @@
-[deeponet_ConvDiff_128] data: 64000 train / 2000 val pairs on 64x64 sensors in 70.9s; target_scale 5.95e+04
-  params: 16.26M
-  linear path fitted by least squares in 8s
-  before SGD: val_rel med 1.71e-06 mean 1.73e-06 max 3.05e-06
-[deeponet_ConvDiff_128] done; best val median rel err 1.712e-06
