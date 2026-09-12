@@ -1,5 +1,8 @@
 import torch
-from neuralop.models import FNO
+try:
+    from neuralop.models import FNO
+except ImportError:  # neuralop only needed for FNOforPDE
+    FNO = None
 import models
 
 class MLSolver(torch.nn.Module):

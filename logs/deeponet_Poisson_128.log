@@ -1,0 +1,5 @@
+[deeponet_Poisson_128] data: 64000 train / 2000 val pairs on 64x64 sensors in 74.1s; target_scale 3.54e+04
+  params: 16.26M
+  linear path fitted by least squares in 8s
+  before SGD: val_rel med 1.69e-06 mean 1.76e-06 max 4.19e-06
+[deeponet_Poisson_128] done; best val median rel err 1.695e-06

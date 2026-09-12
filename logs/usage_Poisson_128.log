@@ -1,0 +1,21 @@
+  jacobi router: mean corrector calls in first 300 its = 1.52
+  jacobi oracle: mean corrector calls in first 300 its = 1.50
+  jacobi hints25: mean corrector calls in first 300 its = 10.28
+  jacobi hints5: mean corrector calls in first 300 its = 51.11
+  jacobi_0.67 router: mean corrector calls in first 300 its = 2.23
+  jacobi_0.67 oracle: mean corrector calls in first 300 its = 2.00
+  jacobi_0.67 hints25: mean corrector calls in first 300 its = 2.00
+  jacobi_0.67 hints5: mean corrector calls in first 300 its = 5.27
+  gs router: mean corrector calls in first 300 its = 2.94
+  gs oracle: mean corrector calls in first 300 its = 3.05
+  gs hints25: mean corrector calls in first 300 its = 3.00
+  gs hints5: mean corrector calls in first 300 its = 3.95
+  ssor router: mean corrector calls in first 300 its = 2.56
+  ssor oracle: mean corrector calls in first 300 its = 2.53
+  ssor hints25: mean corrector calls in first 300 its = 2.27
+  ssor hints5: mean corrector calls in first 300 its = 3.00
+  sor_1.5 router: mean corrector calls in first 300 its = 2.92
+  sor_1.5 oracle: mean corrector calls in first 300 its = 2.77
+  sor_1.5 hints25: mean corrector calls in first 300 its = 3.00
+  sor_1.5 hints5: mean corrector calls in first 300 its = 7.25
+saved ./results/usage_Poisson_128.json

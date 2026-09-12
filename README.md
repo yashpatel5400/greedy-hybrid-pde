@@ -47,4 +47,37 @@ After all these models are trained, run the command:
 `python multiple_solver_results.py --ml_model_name ML_MODEL_NAME --n_test 64 --model_name MODEL_NAME --equation [Poisson/ConvDiff] --numerical_solvers LIST_OF_SOLVERS`
 for all $8$ combinations. All the results (plots and tables) can be found in the results folder
 
+## Wall-Clock Benchmarks (Appendix: Cost-Aware Routing and Wall-Clock Evaluation)
 
+The wall-clock study (branch `costaware-wallclock`, Sept 2026) uses fast $O(N^2)$
+implementations of the same discretizations (`fast_pde.py`, validated against
+`pde.py` / `numerical_solver.py` by `validate_fast_pde.py`), a band-limited
+coarse-grid DeepONet corrector (`corrector.py`), cost-equalised macro-actions
+(`hybrid.py`) and a lightweight learned router (`router.py`). Grid: $128\times128$.
+
+```
+# 1. corrector (64x64 sensor grid = band |k|<=31, fixed Fourier trunk, linear
+#    branch fit by least squares on exact residual/error pairs), one per PDE
+python corrector.py --equation Poisson  --N 128 --coarsen 2
+python corrector.py --equation ConvDiff --N 128 --coarsen 2
+
+# 2. pairwise study for one PDE: measure per-iteration costs (cached in
+#    checkpoints/costs_<eq>_<N>.json), train the routers (oracle rollouts +
+#    2 DAgger rounds), then the timed benchmark (64 test instances; policies
+#    classical / hints{5,10,25,50} / greedy / oracle / router)
+#    -> results/<eq>_<N>_<solver>.json
+./run_pairwise.sh Poisson 128 64
+./run_pairwise.sh ConvDiff 128 64
+
+# 3. untimed decision traces of all test instances (usage figures) and the
+#    ensemble study ({Jacobi,GS}, +SymGS, +Jacobi(0.67), +SOR(1.5))
+./run_phase2.sh
+
+# 4. LaTeX tables (paper/costaware_tables.tex) and figures (paper/neurips_images/ca_*.png)
+python make_tables.py
+python make_figures.py
+```
+
+Timing runs must be executed sequentially on an otherwise idle machine with
+`OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1` (set by the
+run scripts). The paper is built with `paper/build.sh`.

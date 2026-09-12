@@ -1,0 +1,20 @@
+
+=== Poisson N=128 ensemble jacobi+gs ===
+  per-iteration costs: _residual 48us, jacobi 55us, gs 210us, no 655us | spread {'_residual': 1.697951090548579, 'jacobi': 1.052739617874625, 'gs': 1.062717056320587, 'no': 1.1347402677651905} | macro sizes {'jacobi': 12, 'gs': 3, 'no': 1}
+  round 0: 735 states (36.9% corrector-preferred) in 3s
+    router ep 0: loss 2.2151 acc 0.182 median regret 259.096
+    router ep 50: loss 2.0279 acc 0.837 median regret 0.000
+    router ep 100: loss 2.0011 acc 0.856 median regret 0.000
+    router ep 149: loss 1.9992 acc 0.859 median regret 0.000
+  DAgger round 1: +1655 on-policy states (agreement with oracle 27.1%)
+    router ep 0: loss 2.2124 acc 0.269 median regret 1589.651
+    router ep 50: loss 2.0300 acc 0.870 median regret 0.000
+    router ep 100: loss 2.0202 acc 0.876 median regret 0.000
+    router ep 149: loss 2.0184 acc 0.889 median regret 0.000
+  DAgger round 2: +801 on-policy states (agreement with oracle 76.0%)
+    router ep 0: loss 2.2095 acc 0.188 median regret 336.862
+    router ep 50: loss 2.0214 acc 0.825 median regret 0.000
+    router ep 100: loss 2.0103 acc 0.836 median regret 0.000
+    router ep 149: loss 2.0089 acc 0.836 median regret 0.000
+  trained router in 16s -> ./checkpoints/router_Poisson_128_jacobi+gs.pth
+  router decision cost 5.0us

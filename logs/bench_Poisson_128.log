@@ -1,0 +1,75 @@
+
+=== Poisson N=128 ensemble jacobi ===
+  using cached costs from ./checkpoints/costs_Poisson_128.json
+  per-iteration costs: _residual 46us, jacobi 52us, no 635us | spread {'_residual': 1.0569509694359154, 'jacobi': 1.1806533116765927, 'no': 1.033941148291221} | macro sizes {'jacobi': 12, 'no': 1}
+  loaded router ./checkpoints/router_Poisson_128_jacobi.pth
+  router decision cost 5.1us
+  [  8/64] median time-to-h2  classical: 994.6ms | hints25: 2.4ms | hints5: 1.0ms | hints10: 1.3ms | hints50: 3.8ms | greedy: 0.9ms | oracle: 1.0ms | router: 1.0ms   (114s)
+  [ 16/64] median time-to-h2  classical: 1020.3ms | hints25: 2.5ms | hints5: 1.0ms | hints10: 1.4ms | hints50: 4.1ms | greedy: 0.8ms | oracle: 1.0ms | router: 1.0ms   (235s)
+  [ 24/64] median time-to-h2  classical: 1061.5ms | hints25: 2.5ms | hints5: 1.1ms | hints10: 1.4ms | hints50: 4.2ms | greedy: 0.8ms | oracle: 1.0ms | router: 0.9ms   (340s)
+  [ 32/64] median time-to-h2  classical: 1072.8ms | hints25: 2.6ms | hints5: 1.1ms | hints10: 1.4ms | hints50: 4.3ms | greedy: 0.8ms | oracle: 1.0ms | router: 0.9ms   (460s)
+  [ 40/64] median time-to-h2  classical: 1091.5ms | hints25: 2.6ms | hints5: 1.1ms | hints10: 1.4ms | hints50: 4.3ms | greedy: 0.8ms | oracle: 1.0ms | router: 0.9ms   (596s)
+  [ 48/64] median time-to-h2  classical: 1093.9ms | hints25: 2.6ms | hints5: 1.1ms | hints10: 1.4ms | hints50: 4.3ms | greedy: 0.8ms | oracle: 1.0ms | router: 0.9ms   (711s)
+  [ 56/64] median time-to-h2  classical: 1093.9ms | hints25: 2.6ms | hints5: 1.1ms | hints10: 1.4ms | hints50: 4.3ms | greedy: 0.8ms | oracle: 1.0ms | router: 1.0ms   (835s)
+  [ 64/64] median time-to-h2  classical: 1097.3ms | hints25: 2.6ms | hints5: 1.1ms | hints10: 1.5ms | hints50: 4.3ms | greedy: 0.8ms | oracle: 1.0ms | router: 1.0ms   (993s)
+  saved ./results/Poisson_128_jacobi.json
+
+=== Poisson N=128 ensemble jacobi_0.67 ===
+  using cached costs from ./checkpoints/costs_Poisson_128.json
+  per-iteration costs: _residual 46us, jacobi_0.67 52us, no 639us | spread {'_residual': 1.7172953320781665, 'jacobi_0.67': 1.4774880447532257, 'no': 1.1203911612790118} | macro sizes {'jacobi_0.67': 12, 'no': 1}
+  loaded router ./checkpoints/router_Poisson_128_jacobi_0.67.pth
+  router decision cost 5.0us
+  [  8/64] median time-to-h2  classical: 1608.8ms | hints25: 2.7ms | hints5: 1.1ms | hints10: 1.4ms | hints50: 4.0ms | greedy: 0.8ms | oracle: 0.9ms | router: 0.9ms   (66s)
+  [ 16/64] median time-to-h2  classical: 1628.4ms | hints25: 2.7ms | hints5: 1.1ms | hints10: 1.4ms | hints50: 4.3ms | greedy: 0.8ms | oracle: 0.9ms | router: 0.9ms   (131s)
+  [ 24/64] median time-to-h2  classical: 1637.9ms | hints25: 2.7ms | hints5: 1.1ms | hints10: 1.4ms | hints50: 4.3ms | greedy: 0.8ms | oracle: 0.9ms | router: 0.9ms   (197s)
+  [ 32/64] median time-to-h2  classical: 1637.9ms | hints25: 2.7ms | hints5: 1.1ms | hints10: 1.4ms | hints50: 4.3ms | greedy: 0.8ms | oracle: 0.9ms | router: 0.9ms   (263s)
+  [ 40/64] median time-to-h2  classical: 1631.7ms | hints25: 2.6ms | hints5: 1.1ms | hints10: 1.4ms | hints50: 4.3ms | greedy: 0.8ms | oracle: 0.9ms | router: 0.9ms   (328s)
+  [ 48/64] median time-to-h2  classical: 1637.9ms | hints25: 2.6ms | hints5: 1.1ms | hints10: 1.4ms | hints50: 4.3ms | greedy: 0.8ms | oracle: 0.9ms | router: 0.9ms   (394s)
+  [ 56/64] median time-to-h2  classical: 1646.7ms | hints25: 2.6ms | hints5: 1.1ms | hints10: 1.4ms | hints50: 4.3ms | greedy: 0.8ms | oracle: 0.9ms | router: 0.9ms   (460s)
+  [ 64/64] median time-to-h2  classical: 1650.6ms | hints25: 2.6ms | hints5: 1.1ms | hints10: 1.4ms | hints50: 4.3ms | greedy: 0.9ms | oracle: 0.9ms | router: 0.9ms   (526s)
+  saved ./results/Poisson_128_jacobi_0.67.json
+
+=== Poisson N=128 ensemble gs ===
+  using cached costs from ./checkpoints/costs_Poisson_128.json
+  per-iteration costs: _residual 49us, gs 200us, no 643us | spread {'_residual': 1.6560969851257994, 'gs': 1.0811930405965202, 'no': 1.1106057571080137} | macro sizes {'gs': 3, 'no': 1}
+  loaded router ./checkpoints/router_Poisson_128_gs.pth
+  router decision cost 5.3us
+  [  8/64] median time-to-h2  classical: 1778.7ms | hints25: 6.7ms | hints5: 2.0ms | hints10: 3.3ms | hints50: 12.2ms | greedy: 1.0ms | oracle: 1.0ms | router: 1.1ms   (66s)
+  [ 16/64] median time-to-h2  classical: 1783.3ms | hints25: 6.8ms | hints5: 2.0ms | hints10: 3.3ms | hints50: 12.2ms | greedy: 1.0ms | oracle: 1.0ms | router: 1.1ms   (133s)
+  [ 24/64] median time-to-h2  classical: 1788.1ms | hints25: 6.7ms | hints5: 2.0ms | hints10: 3.2ms | hints50: 12.2ms | greedy: 1.0ms | oracle: 0.9ms | router: 1.0ms   (199s)
+  [ 32/64] median time-to-h2  classical: 1795.0ms | hints25: 6.6ms | hints5: 2.0ms | hints10: 3.2ms | hints50: 12.1ms | greedy: 1.0ms | oracle: 1.0ms | router: 1.0ms   (266s)
+  [ 40/64] median time-to-h2  classical: 1792.5ms | hints25: 6.6ms | hints5: 2.0ms | hints10: 3.2ms | hints50: 12.1ms | greedy: 1.0ms | oracle: 1.0ms | router: 1.0ms   (332s)
+  [ 48/64] median time-to-h2  classical: 1793.5ms | hints25: 6.6ms | hints5: 2.0ms | hints10: 3.2ms | hints50: 12.1ms | greedy: 1.0ms | oracle: 1.0ms | router: 1.0ms   (398s)
+  [ 56/64] median time-to-h2  classical: 1796.8ms | hints25: 6.6ms | hints5: 2.0ms | hints10: 3.2ms | hints50: 12.1ms | greedy: 1.0ms | oracle: 1.0ms | router: 1.0ms   (465s)
+  [ 64/64] median time-to-h2  classical: 1798.0ms | hints25: 6.6ms | hints5: 2.0ms | hints10: 3.2ms | hints50: 12.1ms | greedy: 1.0ms | oracle: 1.0ms | router: 1.0ms   (531s)
+  saved ./results/Poisson_128_gs.json
+
+=== Poisson N=128 ensemble ssor ===
+  using cached costs from ./checkpoints/costs_Poisson_128.json
+  per-iteration costs: _residual 46us, ssor 366us, no 635us | spread {'_residual': 1.7313019390581719, 'ssor': 1.0956822831632056, 'no': 1.1249870593606222} | macro sizes {'ssor': 2, 'no': 1}
+  loaded router ./checkpoints/router_Poisson_128_ssor.pth
+  router decision cost 5.1us
+  [  8/64] median time-to-h2  classical: 1527.7ms | hints25: 10.2ms | hints5: 2.6ms | hints10: 4.6ms | hints50: 19.9ms | greedy: 1.0ms | oracle: 0.9ms | router: 1.0ms   (56s)
+  [ 16/64] median time-to-h2  classical: 1537.8ms | hints25: 10.2ms | hints5: 2.6ms | hints10: 4.5ms | hints50: 19.7ms | greedy: 1.0ms | oracle: 1.0ms | router: 1.0ms   (112s)
+  [ 24/64] median time-to-h2  classical: 1537.8ms | hints25: 10.2ms | hints5: 2.6ms | hints10: 4.5ms | hints50: 19.7ms | greedy: 1.0ms | oracle: 0.9ms | router: 0.9ms   (168s)
+  [ 32/64] median time-to-h2  classical: 1537.8ms | hints25: 10.2ms | hints5: 2.6ms | hints10: 4.6ms | hints50: 19.7ms | greedy: 1.0ms | oracle: 1.0ms | router: 1.0ms   (224s)
+  [ 40/64] median time-to-h2  classical: 1534.9ms | hints25: 10.2ms | hints5: 2.6ms | hints10: 4.6ms | hints50: 19.7ms | greedy: 1.0ms | oracle: 1.0ms | router: 1.0ms   (279s)
+  [ 48/64] median time-to-h2  classical: 1537.6ms | hints25: 10.2ms | hints5: 2.6ms | hints10: 4.5ms | hints50: 19.7ms | greedy: 1.0ms | oracle: 1.0ms | router: 1.0ms   (335s)
+  [ 56/64] median time-to-h2  classical: 1535.6ms | hints25: 10.2ms | hints5: 2.6ms | hints10: 4.5ms | hints50: 19.7ms | greedy: 1.0ms | oracle: 1.1ms | router: 1.1ms   (391s)
+  [ 64/64] median time-to-h2  classical: 1534.8ms | hints25: 10.2ms | hints5: 2.6ms | hints10: 4.5ms | hints50: 19.7ms | greedy: 1.1ms | oracle: 1.1ms | router: 1.2ms   (447s)
+  saved ./results/Poisson_128_ssor.json
+
+=== Poisson N=128 ensemble sor_1.5 ===
+  using cached costs from ./checkpoints/costs_Poisson_128.json
+  per-iteration costs: _residual 47us, sor_1.5 197us, no 635us | spread {'_residual': 1.7179759036144577, 'sor_1.5': 1.104173643739866, 'no': 1.12061002548853} | macro sizes {'sor_1.5': 3, 'no': 1}
+  loaded router ./checkpoints/router_Poisson_128_sor_1.5.pth
+  router decision cost 5.1us
+  [  8/64] median time-to-h2  classical: 596.0ms | hints25: 12.6ms | hints5: 3.3ms | hints10: 5.6ms | hints50: 19.3ms | greedy: 1.0ms | oracle: 1.0ms | router: 1.0ms   (24s)
+  [ 16/64] median time-to-h2  classical: 596.0ms | hints25: 12.3ms | hints5: 3.3ms | hints10: 5.6ms | hints50: 17.5ms | greedy: 1.0ms | oracle: 1.0ms | router: 1.0ms   (47s)
+  [ 24/64] median time-to-h2  classical: 596.6ms | hints25: 12.2ms | hints5: 3.3ms | hints10: 5.6ms | hints50: 17.1ms | greedy: 1.0ms | oracle: 0.9ms | router: 1.0ms   (71s)
+  [ 32/64] median time-to-h2  classical: 596.0ms | hints25: 12.0ms | hints5: 3.3ms | hints10: 5.6ms | hints50: 17.3ms | greedy: 1.0ms | oracle: 0.9ms | router: 1.0ms   (94s)
+  [ 40/64] median time-to-h2  classical: 594.2ms | hints25: 12.1ms | hints5: 3.3ms | hints10: 5.6ms | hints50: 17.6ms | greedy: 1.0ms | oracle: 0.9ms | router: 1.0ms   (118s)
+  [ 48/64] median time-to-h2  classical: 595.1ms | hints25: 12.0ms | hints5: 3.3ms | hints10: 5.6ms | hints50: 17.4ms | greedy: 1.0ms | oracle: 0.9ms | router: 1.0ms   (141s)
+  [ 56/64] median time-to-h2  classical: 595.8ms | hints25: 12.0ms | hints5: 3.3ms | hints10: 5.6ms | hints50: 17.4ms | greedy: 1.0ms | oracle: 1.0ms | router: 1.0ms   (165s)
+  [ 64/64] median time-to-h2  classical: 595.8ms | hints25: 12.0ms | hints5: 3.3ms | hints10: 5.6ms | hints50: 17.4ms | greedy: 1.0ms | oracle: 1.0ms | router: 1.0ms   (189s)
+  saved ./results/Poisson_128_sor_1.5.json

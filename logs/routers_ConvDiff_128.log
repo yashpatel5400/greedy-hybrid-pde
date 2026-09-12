@@ -1,0 +1,105 @@
+
+=== ConvDiff N=128 ensemble jacobi ===
+  using cached costs from ./checkpoints/costs_ConvDiff_128.json
+  per-iteration costs: _residual 67us, jacobi 72us, no 658us | spread {'_residual': 1.141248628252732, 'jacobi': 1.3015668385561285, 'no': 1.105890687865489} | macro sizes {'jacobi': 9, 'no': 1}
+  round 0: 73036 states (0.3% corrector-preferred) in 195s
+    router ep 0: loss 0.6928 acc 0.953 median regret 0.000
+    router ep 50: loss 0.6903 acc 1.000 median regret 0.000
+    router ep 100: loss 0.6902 acc 0.999 median regret 0.000
+    router ep 149: loss 0.6902 acc 1.000 median regret 0.000
+  DAgger round 1: +63542 on-policy states (agreement with oracle 97.8%)
+    router ep 0: loss 0.6921 acc 0.986 median regret 0.000
+    router ep 50: loss 0.6901 acc 0.999 median regret 0.000
+    router ep 100: loss 0.6900 acc 0.999 median regret 0.000
+    router ep 149: loss 0.6900 acc 0.999 median regret 0.000
+  DAgger round 2: +68703 on-policy states (agreement with oracle 99.5%)
+    router ep 0: loss 0.6919 acc 0.993 median regret 0.000
+    router ep 50: loss 0.6901 acc 0.998 median regret 0.000
+    router ep 100: loss 0.6900 acc 0.999 median regret 0.000
+    router ep 149: loss 0.6900 acc 0.999 median regret 0.000
+  trained router in 587s -> ./checkpoints/router_ConvDiff_128_jacobi.pth
+  router decision cost 5.3us
+
+=== ConvDiff N=128 ensemble jacobi_0.67 ===
+  using cached costs from ./checkpoints/costs_ConvDiff_128.json
+  per-iteration costs: _residual 66us, jacobi_0.67 71us, no 659us | spread {'_residual': 1.5528838502868314, 'jacobi_0.67': 1.5213858797161, 'no': 1.1371124382575943} | macro sizes {'jacobi_0.67': 9, 'no': 1}
+  round 0: 678 states (38.3% corrector-preferred) in 1s
+    router ep 0: loss 0.6824 acc 0.739 median regret 0.000
+    router ep 50: loss 0.3076 acc 0.841 median regret 0.000
+    router ep 100: loss 0.2159 acc 0.960 median regret 0.000
+    router ep 149: loss 0.2031 acc 0.962 median regret 0.000
+  DAgger round 1: +658 on-policy states (agreement with oracle 95.0%)
+    router ep 0: loss 0.6819 acc 0.609 median regret 0.000
+    router ep 50: loss 0.3045 acc 0.926 median regret 0.000
+    router ep 100: loss 0.2020 acc 0.967 median regret 0.000
+    router ep 149: loss 0.1881 acc 0.967 median regret 0.000
+  DAgger round 2: +653 on-policy states (agreement with oracle 96.6%)
+    router ep 0: loss 0.6783 acc 0.604 median regret 0.000
+    router ep 50: loss 0.3076 acc 0.959 median regret 0.000
+    router ep 100: loss 0.2159 acc 0.966 median regret 0.000
+    router ep 149: loss 0.2026 acc 0.966 median regret 0.000
+  trained router in 4s -> ./checkpoints/router_ConvDiff_128_jacobi_0.67.pth
+  router decision cost 5.2us
+
+=== ConvDiff N=128 ensemble gs ===
+  using cached costs from ./checkpoints/costs_ConvDiff_128.json
+  per-iteration costs: _residual 75us, gs 234us, no 673us | spread {'_residual': 1.171206745641992, 'gs': 1.042659836556213, 'no': 1.1318709138381202} | macro sizes {'gs': 3, 'no': 1}
+  round 0: 1081 states (40.0% corrector-preferred) in 3s
+    router ep 0: loss 0.6833 acc 0.737 median regret 0.000
+    router ep 50: loss 0.3677 acc 0.890 median regret 0.000
+    router ep 100: loss 0.3106 acc 0.938 median regret 0.000
+    router ep 149: loss 0.3004 acc 0.944 median regret 0.000
+  DAgger round 1: +1040 on-policy states (agreement with oracle 96.4%)
+    router ep 0: loss 0.6834 acc 0.607 median regret 0.000
+    router ep 50: loss 0.3006 acc 0.962 median regret 0.000
+    router ep 100: loss 0.2493 acc 0.976 median regret 0.000
+    router ep 149: loss 0.2452 acc 0.974 median regret 0.000
+  DAgger round 2: +1009 on-policy states (agreement with oracle 97.3%)
+    router ep 0: loss 0.6754 acc 0.601 median regret 0.000
+    router ep 50: loss 0.3055 acc 0.926 median regret 0.000
+    router ep 100: loss 0.2389 acc 0.974 median regret 0.000
+    router ep 149: loss 0.2349 acc 0.975 median regret 0.000
+  trained router in 8s -> ./checkpoints/router_ConvDiff_128_gs.pth
+  router decision cost 5.4us
+
+=== ConvDiff N=128 ensemble ssor ===
+  using cached costs from ./checkpoints/costs_ConvDiff_128.json
+  per-iteration costs: _residual 66us, ssor 378us, no 665us | spread {'_residual': 1.3504765942626984, 'ssor': 1.0810959184751379, 'no': 1.058593283809419} | macro sizes {'ssor': 2, 'no': 1}
+  round 0: 940 states (40.2% corrector-preferred) in 3s
+    router ep 0: loss 0.6809 acc 0.745 median regret 0.000
+    router ep 50: loss 0.3296 acc 0.844 median regret 0.000
+    router ep 100: loss 0.2783 acc 0.916 median regret 0.000
+    router ep 149: loss 0.2708 acc 0.923 median regret 0.000
+  DAgger round 1: +907 on-policy states (agreement with oracle 93.6%)
+    router ep 0: loss 0.6858 acc 0.608 median regret 0.000
+    router ep 50: loss 0.3291 acc 0.877 median regret 0.000
+    router ep 100: loss 0.2654 acc 0.960 median regret 0.000
+    router ep 149: loss 0.2560 acc 0.964 median regret 0.000
+  DAgger round 2: +868 on-policy states (agreement with oracle 95.2%)
+    router ep 0: loss 0.6778 acc 0.601 median regret 0.000
+    router ep 50: loss 0.2755 acc 0.927 median regret 0.000
+    router ep 100: loss 0.2194 acc 0.970 median regret 0.000
+    router ep 149: loss 0.2143 acc 0.970 median regret 0.000
+  trained router in 8s -> ./checkpoints/router_ConvDiff_128_ssor.pth
+  router decision cost 5.2us
+
+=== ConvDiff N=128 ensemble sor_1.5 ===
+  using cached costs from ./checkpoints/costs_ConvDiff_128.json
+  per-iteration costs: _residual 65us, sor_1.5 223us, no 660us | spread {'_residual': 1.548577232644393, 'sor_1.5': 1.0547782012146951, 'no': 1.129839949590422} | macro sizes {'sor_1.5': 3, 'no': 1}
+  round 0: 1589 states (25.7% corrector-preferred) in 4s
+    router ep 0: loss 0.6940 acc 0.785 median regret 0.000
+    router ep 50: loss 0.4520 acc 0.827 median regret 0.000
+    router ep 100: loss 0.4204 acc 0.853 median regret 0.000
+    router ep 149: loss 0.4154 acc 0.865 median regret 0.000
+  DAgger round 1: +1486 on-policy states (agreement with oracle 77.0%)
+    router ep 0: loss 0.6821 acc 0.640 median regret 0.000
+    router ep 50: loss 0.3870 acc 0.927 median regret 0.000
+    router ep 100: loss 0.3765 acc 0.927 median regret 0.000
+    router ep 149: loss 0.3753 acc 0.927 median regret 0.000
+  DAgger round 2: +1466 on-policy states (agreement with oracle 92.2%)
+    router ep 0: loss 0.6714 acc 0.678 median regret 0.000
+    router ep 50: loss 0.3827 acc 0.914 median regret 0.000
+    router ep 100: loss 0.3747 acc 0.921 median regret 0.000
+    router ep 149: loss 0.3732 acc 0.920 median regret 0.000
+  trained router in 13s -> ./checkpoints/router_ConvDiff_128_sor_1.5.pth
+  router decision cost 5.2us

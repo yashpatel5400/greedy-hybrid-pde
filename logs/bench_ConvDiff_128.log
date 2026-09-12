@@ -1,0 +1,75 @@
+
+=== ConvDiff N=128 ensemble jacobi ===
+  using cached costs from ./checkpoints/costs_ConvDiff_128.json
+  per-iteration costs: _residual 67us, jacobi 72us, no 658us | spread {'_residual': 1.141248628252732, 'jacobi': 1.3015668385561285, 'no': 1.105890687865489} | macro sizes {'jacobi': 9, 'no': 1}
+  loaded router ./checkpoints/router_ConvDiff_128_jacobi.pth
+  router decision cost 5.2us
+  [  8/64] median time-to-h2  classical: 1414.4ms | hints25: 3.0ms | hints5: 1.2ms | hints10: 1.7ms | hints50: 5.3ms | greedy: 0.9ms | oracle: 1.0ms | router: 1.1ms   (157s)
+  [ 16/64] median time-to-h2  classical: 1490.7ms | hints25: 3.5ms | hints5: 1.3ms | hints10: 1.8ms | hints50: 5.7ms | greedy: 1.0ms | oracle: 1.0ms | router: 1.1ms   (320s)
+  [ 24/64] median time-to-h2  classical: 1506.5ms | hints25: 3.5ms | hints5: 1.3ms | hints10: 1.8ms | hints50: 5.8ms | greedy: 0.9ms | oracle: 1.0ms | router: 1.1ms   (469s)
+  [ 32/64] median time-to-h2  classical: 1519.7ms | hints25: 3.5ms | hints5: 1.3ms | hints10: 1.8ms | hints50: 5.8ms | greedy: 0.9ms | oracle: 1.0ms | router: 1.1ms   (638s)
+  [ 40/64] median time-to-h2  classical: 1506.5ms | hints25: 3.4ms | hints5: 1.3ms | hints10: 1.8ms | hints50: 5.8ms | greedy: 1.0ms | oracle: 1.1ms | router: 1.1ms   (827s)
+  [ 48/64] median time-to-h2  classical: 1510.3ms | hints25: 3.4ms | hints5: 1.3ms | hints10: 1.8ms | hints50: 5.8ms | greedy: 1.0ms | oracle: 1.1ms | router: 1.1ms   (990s)
+  [ 56/64] median time-to-h2  classical: 1532.1ms | hints25: 3.4ms | hints5: 1.3ms | hints10: 1.8ms | hints50: 5.7ms | greedy: 1.0ms | oracle: 1.1ms | router: 1.2ms   (1160s)
+  [ 64/64] median time-to-h2  classical: 1534.2ms | hints25: 3.4ms | hints5: 1.3ms | hints10: 1.8ms | hints50: 5.8ms | greedy: 1.0ms | oracle: 1.1ms | router: 1.2ms   (1372s)
+  saved ./results/ConvDiff_128_jacobi.json
+
+=== ConvDiff N=128 ensemble jacobi_0.67 ===
+  using cached costs from ./checkpoints/costs_ConvDiff_128.json
+  per-iteration costs: _residual 66us, jacobi_0.67 71us, no 659us | spread {'_residual': 1.5528838502868314, 'jacobi_0.67': 1.5213858797161, 'no': 1.1371124382575943} | macro sizes {'jacobi_0.67': 9, 'no': 1}
+  loaded router ./checkpoints/router_ConvDiff_128_jacobi_0.67.pth
+  router decision cost 5.2us
+  [  8/64] median time-to-h2  classical: 2214.4ms | hints25: 3.4ms | hints5: 1.3ms | hints10: 1.7ms | hints50: 5.3ms | greedy: 1.0ms | oracle: 1.1ms | router: 1.1ms   (87s)
+  [ 16/64] median time-to-h2  classical: 2195.5ms | hints25: 3.4ms | hints5: 1.3ms | hints10: 1.7ms | hints50: 5.6ms | greedy: 1.0ms | oracle: 1.1ms | router: 1.1ms   (172s)
+  [ 24/64] median time-to-h2  classical: 2178.2ms | hints25: 3.4ms | hints5: 1.3ms | hints10: 1.8ms | hints50: 5.7ms | greedy: 1.0ms | oracle: 1.0ms | router: 1.1ms   (259s)
+  [ 32/64] median time-to-h2  classical: 2204.7ms | hints25: 3.4ms | hints5: 1.3ms | hints10: 1.8ms | hints50: 5.7ms | greedy: 1.0ms | oracle: 1.0ms | router: 1.1ms   (346s)
+  [ 40/64] median time-to-h2  classical: 2215.6ms | hints25: 3.4ms | hints5: 1.3ms | hints10: 1.8ms | hints50: 5.7ms | greedy: 1.0ms | oracle: 1.0ms | router: 1.1ms   (431s)
+  [ 48/64] median time-to-h2  classical: 2206.9ms | hints25: 3.4ms | hints5: 1.3ms | hints10: 1.8ms | hints50: 5.7ms | greedy: 1.0ms | oracle: 1.0ms | router: 1.1ms   (517s)
+  [ 56/64] median time-to-h2  classical: 2212.4ms | hints25: 3.4ms | hints5: 1.3ms | hints10: 1.8ms | hints50: 5.7ms | greedy: 1.0ms | oracle: 1.0ms | router: 1.1ms   (604s)
+  [ 64/64] median time-to-h2  classical: 2213.5ms | hints25: 3.4ms | hints5: 1.3ms | hints10: 1.8ms | hints50: 5.7ms | greedy: 1.1ms | oracle: 1.1ms | router: 1.1ms   (689s)
+  saved ./results/ConvDiff_128_jacobi_0.67.json
+
+=== ConvDiff N=128 ensemble gs ===
+  using cached costs from ./checkpoints/costs_ConvDiff_128.json
+  per-iteration costs: _residual 75us, gs 234us, no 673us | spread {'_residual': 1.171206745641992, 'gs': 1.042659836556213, 'no': 1.1318709138381202} | macro sizes {'gs': 3, 'no': 1}
+  loaded router ./checkpoints/router_ConvDiff_128_gs.pth
+  router decision cost 5.0us
+  [  8/64] median time-to-h2  classical: 1593.7ms | hints25: 8.5ms | hints5: 3.6ms | hints10: 5.7ms | hints50: 14.1ms | greedy: 1.1ms | oracle: 1.2ms | router: 1.2ms   (60s)
+  [ 16/64] median time-to-h2  classical: 1604.8ms | hints25: 8.2ms | hints5: 3.5ms | hints10: 5.2ms | hints50: 14.2ms | greedy: 1.1ms | oracle: 1.2ms | router: 1.2ms   (121s)
+  [ 24/64] median time-to-h2  classical: 1608.2ms | hints25: 8.1ms | hints5: 3.5ms | hints10: 4.7ms | hints50: 13.9ms | greedy: 1.1ms | oracle: 1.1ms | router: 1.1ms   (182s)
+  [ 32/64] median time-to-h2  classical: 1630.2ms | hints25: 8.1ms | hints5: 3.6ms | hints10: 4.7ms | hints50: 13.9ms | greedy: 1.1ms | oracle: 1.1ms | router: 1.1ms   (243s)
+  [ 40/64] median time-to-h2  classical: 1612.6ms | hints25: 8.2ms | hints5: 3.6ms | hints10: 5.0ms | hints50: 14.1ms | greedy: 1.1ms | oracle: 1.1ms | router: 1.1ms   (304s)
+  [ 48/64] median time-to-h2  classical: 1630.2ms | hints25: 8.2ms | hints5: 3.6ms | hints10: 4.8ms | hints50: 14.0ms | greedy: 1.1ms | oracle: 1.1ms | router: 1.1ms   (365s)
+  [ 56/64] median time-to-h2  classical: 1635.7ms | hints25: 8.2ms | hints5: 3.6ms | hints10: 4.8ms | hints50: 14.0ms | greedy: 1.1ms | oracle: 1.2ms | router: 1.2ms   (426s)
+  [ 64/64] median time-to-h2  classical: 1630.2ms | hints25: 8.2ms | hints5: 3.6ms | hints10: 4.8ms | hints50: 14.0ms | greedy: 1.2ms | oracle: 1.2ms | router: 1.2ms   (486s)
+  saved ./results/ConvDiff_128_gs.json
+
+=== ConvDiff N=128 ensemble ssor ===
+  using cached costs from ./checkpoints/costs_ConvDiff_128.json
+  per-iteration costs: _residual 66us, ssor 378us, no 665us | spread {'_residual': 1.3504765942626984, 'ssor': 1.0810959184751379, 'no': 1.058593283809419} | macro sizes {'ssor': 2, 'no': 1}
+  loaded router ./checkpoints/router_ConvDiff_128_ssor.pth
+  router decision cost 5.0us
+  [  8/64] median time-to-h2  classical: 1533.6ms | hints25: 11.1ms | hints5: 3.0ms | hints10: 5.1ms | hints50: 21.5ms | greedy: 1.2ms | oracle: 1.3ms | router: 1.3ms   (58s)
+  [ 16/64] median time-to-h2  classical: 1545.7ms | hints25: 11.2ms | hints5: 3.0ms | hints10: 5.2ms | hints50: 21.5ms | greedy: 1.2ms | oracle: 1.3ms | router: 1.3ms   (117s)
+  [ 24/64] median time-to-h2  classical: 1557.0ms | hints25: 11.2ms | hints5: 3.0ms | hints10: 5.1ms | hints50: 21.4ms | greedy: 1.1ms | oracle: 1.1ms | router: 1.1ms   (175s)
+  [ 32/64] median time-to-h2  classical: 1569.2ms | hints25: 11.3ms | hints5: 3.0ms | hints10: 5.1ms | hints50: 21.3ms | greedy: 1.1ms | oracle: 1.1ms | router: 1.1ms   (234s)
+  [ 40/64] median time-to-h2  classical: 1565.5ms | hints25: 11.3ms | hints5: 3.0ms | hints10: 5.1ms | hints50: 21.3ms | greedy: 1.1ms | oracle: 1.1ms | router: 1.1ms   (292s)
+  [ 48/64] median time-to-h2  classical: 1572.5ms | hints25: 11.3ms | hints5: 3.0ms | hints10: 5.1ms | hints50: 21.3ms | greedy: 1.1ms | oracle: 1.1ms | router: 1.1ms   (351s)
+  [ 56/64] median time-to-h2  classical: 1580.0ms | hints25: 11.3ms | hints5: 2.9ms | hints10: 5.1ms | hints50: 21.3ms | greedy: 1.2ms | oracle: 1.2ms | router: 1.2ms   (410s)
+  [ 64/64] median time-to-h2  classical: 1572.5ms | hints25: 11.2ms | hints5: 3.0ms | hints10: 5.1ms | hints50: 21.3ms | greedy: 1.2ms | oracle: 1.2ms | router: 1.2ms   (468s)
+  saved ./results/ConvDiff_128_ssor.json
+
+=== ConvDiff N=128 ensemble sor_1.5 ===
+  using cached costs from ./checkpoints/costs_ConvDiff_128.json
+  per-iteration costs: _residual 65us, sor_1.5 223us, no 660us | spread {'_residual': 1.548577232644393, 'sor_1.5': 1.0547782012146951, 'no': 1.129839949590422} | macro sizes {'sor_1.5': 3, 'no': 1}
+  loaded router ./checkpoints/router_ConvDiff_128_sor_1.5.pth
+  router decision cost 5.0us
+  [  8/64] median time-to-h2  classical: 370.4ms | hints25: 13.8ms | hints5: 3.7ms | hints10: 6.2ms | hints50: 25.9ms | greedy: 1.5ms | oracle: 1.4ms | router: 1.3ms   (16s)
+  [ 16/64] median time-to-h2  classical: 374.8ms | hints25: 13.8ms | hints5: 3.8ms | hints10: 6.2ms | hints50: 25.8ms | greedy: 1.5ms | oracle: 1.4ms | router: 1.3ms   (32s)
+  [ 24/64] median time-to-h2  classical: 380.3ms | hints25: 13.8ms | hints5: 3.7ms | hints10: 6.2ms | hints50: 25.8ms | greedy: 1.3ms | oracle: 1.1ms | router: 1.1ms   (48s)
+  [ 32/64] median time-to-h2  classical: 382.5ms | hints25: 13.7ms | hints5: 3.7ms | hints10: 6.2ms | hints50: 25.8ms | greedy: 1.3ms | oracle: 1.1ms | router: 1.1ms   (64s)
+  [ 40/64] median time-to-h2  classical: 380.4ms | hints25: 13.7ms | hints5: 3.7ms | hints10: 6.2ms | hints50: 25.9ms | greedy: 1.3ms | oracle: 1.2ms | router: 1.1ms   (81s)
+  [ 48/64] median time-to-h2  classical: 385.0ms | hints25: 13.7ms | hints5: 3.7ms | hints10: 6.2ms | hints50: 25.9ms | greedy: 1.3ms | oracle: 1.2ms | router: 1.1ms   (97s)
+  [ 56/64] median time-to-h2  classical: 385.4ms | hints25: 13.6ms | hints5: 3.7ms | hints10: 6.2ms | hints50: 25.9ms | greedy: 1.5ms | oracle: 1.4ms | router: 1.3ms   (113s)
+  [ 64/64] median time-to-h2  classical: 385.0ms | hints25: 13.6ms | hints5: 3.7ms | hints10: 6.2ms | hints50: 25.9ms | greedy: 1.5ms | oracle: 1.5ms | router: 1.4ms   (129s)
+  saved ./results/ConvDiff_128_sor_1.5.json

@@ -1,0 +1,30 @@
+
+=== Poisson N=128 ensemble jacobi ===
+  using cached costs from ./checkpoints/costs_Poisson_128.json
+  per-iteration costs: _residual 46us, jacobi 52us, no 635us | spread {'_residual': 1.0569509694359154, 'jacobi': 1.1806533116765927, 'no': 1.033941148291221} | macro sizes {'jacobi': 12, 'no': 1}
+  loaded router ./checkpoints/router_Poisson_128_jacobi.pth
+  router decision cost 5.3us
+
+=== Poisson N=128 ensemble jacobi_0.67 ===
+  using cached costs from ./checkpoints/costs_Poisson_128.json
+  per-iteration costs: _residual 46us, jacobi_0.67 52us, no 639us | spread {'_residual': 1.7172953320781665, 'jacobi_0.67': 1.4774880447532257, 'no': 1.1203911612790118} | macro sizes {'jacobi_0.67': 12, 'no': 1}
+  loaded router ./checkpoints/router_Poisson_128_jacobi_0.67.pth
+  router decision cost 5.2us
+
+=== Poisson N=128 ensemble gs ===
+  using cached costs from ./checkpoints/costs_Poisson_128.json
+  per-iteration costs: _residual 49us, gs 200us, no 643us | spread {'_residual': 1.6560969851257994, 'gs': 1.0811930405965202, 'no': 1.1106057571080137} | macro sizes {'gs': 3, 'no': 1}
+  loaded router ./checkpoints/router_Poisson_128_gs.pth
+  router decision cost 5.1us
+
+=== Poisson N=128 ensemble ssor ===
+  using cached costs from ./checkpoints/costs_Poisson_128.json
+  per-iteration costs: _residual 46us, ssor 366us, no 635us | spread {'_residual': 1.7313019390581719, 'ssor': 1.0956822831632056, 'no': 1.1249870593606222} | macro sizes {'ssor': 2, 'no': 1}
+  loaded router ./checkpoints/router_Poisson_128_ssor.pth
+  router decision cost 5.1us
+
+=== Poisson N=128 ensemble sor_1.5 ===
+  using cached costs from ./checkpoints/costs_Poisson_128.json
+  per-iteration costs: _residual 47us, sor_1.5 197us, no 635us | spread {'_residual': 1.7179759036144577, 'sor_1.5': 1.104173643739866, 'no': 1.12061002548853} | macro sizes {'sor_1.5': 3, 'no': 1}
+  loaded router ./checkpoints/router_Poisson_128_sor_1.5.pth
+  router decision cost 5.1us
