@@ -120,216 +120,262 @@ def cell_time(rows, base_rows, key, bold=False):
     return f"\\textbf{{{s}}}" if bold else s
 
 
+def rng_macro(name, vals):
+    vals = [v for v in vals if np.isfinite(v)]
+    if not vals:
+        return
+    lo, hi = min(vals), max(vals)
+    OUT.append(f"\\newcommand{{\\{name}Min}}{{{fmt_sp(lo)}}}")
+    OUT.append(f"\\newcommand{{\\{name}Max}}{{{fmt_sp(hi)}}}")
+
+
 def main():
+    global OUT
     R = load()
-    out = []
+    out = OUT = []
     N = None
 
-    # ------------------------------------------------------------ main table
-    out.append("\\newcommand{\\cawcmain}{")
-    out.append("\\begin{tabular}{llcccccc}\n\\toprule")
-    out.append("Equation & Solver & Solver only & HINTS ($\\tau{=}25$) & HINTS (best $\\tau$) & "
-               "Greedy oracle & Cost-aware oracle & Learned router (ours) \\\\ \\midrule")
-    for eq in EQS:
-        first = True
-        for spec in SOLVER_ORDER:
-            keys = [k for k in R if k[0] == eq and k[1] == MAIN_N and k[2] == spec and not k[3]]
-            if not keys:
-                continue
-            d, g = R[keys[0]]
-            N = keys[0][1]
-            key = tkey(d, d["h2"])
-            P = g["policies"]
-            base = P["classical"]
-            # best fixed tau by median time
-            taus = [p for p in P if p.startswith("hints")]
-            best_tau = min(taus, key=lambda p: np.median(times(P[p], key)))
-            # deployable comparison: router vs every HINTS and classical
-            t_r = times(P["router"], key)
-            best_dep = "router"
-            for p in taus + ["classical"]:
-                if np.median(times(P[p], key)) < np.median(t_r):
-                    best_dep = p
-            row = [eq if first else "", SOLVER_NAMES[spec],
-                   cell_time(base, base, key),
-                   cell_time(P["hints25"], base, key, bold=(best_dep == "hints25")),
-                   cell_time(P[best_tau], base, key, bold=(best_dep == best_tau)).replace(
-                       ")", f"; $\\tau{{=}}{best_tau[5:]}$)", 1),
-                   cell_time(P["greedy"], base, key) if "greedy" in P else "--",
-                   "\\textit{" + cell_time(P["oracle"], base, key) + "}",
-                   cell_time(P["router"], base, key, bold=(best_dep == "router"))]
-            out.append(" & ".join(row) + " \\\\")
-            first = False
-        if eq != EQS[-1] and any(k[0] == EQS[EQS.index(eq)+1] for k in R):
-            out.append("\\midrule")
-    out.append("\\bottomrule\n\\end{tabular}}")
-
-    # -------------------------------------------- router vs HINTS speedup table
-    out.append("\\newcommand{\\cavshints}{")
-    out.append("\\begin{tabular}{llcccccc}\n\\toprule")
-    out.append("& & \\multicolumn{3}{c}{vs.\\ HINTS ($\\tau{=}25$)} & \\multicolumn{3}{c}{vs.\\ best fixed $\\tau$} \\\\")
-    out.append("\\cmidrule(lr){3-5}\\cmidrule(lr){6-8}")
-    out.append("Equation & Solver & $\\varepsilon{=}10^{-3}$ & $\\varepsilon{=}h^2$ & $\\varepsilon{=}10^{-8}$ & "
-               "$\\varepsilon{=}10^{-3}$ & $\\varepsilon{=}h^2$ & $\\varepsilon{=}10^{-8}$ \\\\ \\midrule")
-    for eq in EQS:
-        first = True
-        for spec in SOLVER_ORDER:
-            keys = [k for k in R if k[0] == eq and k[1] == MAIN_N and k[2] == spec and not k[3]]
-            if not keys:
-                continue
-            d, g = R[keys[0]]
-            P = g["policies"]
-            taus = [p for p in P if p.startswith("hints")]
-            cells = []
-            for ref in ["hints25", "best"]:
-                for tol in [1e-3, d["h2"], 1e-8]:
-                    key = tkey(d, tol)
-                    t_r = times(P["router"], key)
-                    if ref == "best":
-                        bt = min(taus, key=lambda p: np.median(times(P[p], key)))
-                        t_h = times(P[bt], key)
-                        lab = f" ($\\tau{{=}}{bt[5:]}$)"
-                    else:
-                        t_h = times(P["hints25"], key)
-                        lab = ""
-                    sp, r = paired_speedup(t_h, t_r)
-                    ok = np.isfinite(r) & (r > 0)
-                    p = wilcoxon(np.log(r[ok]), alternative="greater").pvalue if ok.sum() >= 8 and not np.allclose(r[ok], 1.0) else 1.0
-                    s = fmt_sp(sp) + lab
-                    if sp >= 1.10 and p < 0.01:
-                        s = f"\\textbf{{{s}}}"
-                    cells.append(s)
-            out.append(" & ".join([eq if first else "", SOLVER_NAMES[spec]] + cells) + " \\\\")
-            first = False
-        if eq != EQS[-1] and any(k[0] == EQS[EQS.index(eq)+1] for k in R):
-            out.append("\\midrule")
-    out.append("\\bottomrule\n\\end{tabular}}")
-
-    # ----------------------------------------------------- tolerance sweeps
-    for eq in EQS:
-        out.append(f"\\newcommand{{\\cawctol{eq.lower().replace('diff','')}}}{{")
+    def grid_tables(N_, SUF):
+        """All per-grid tables (main, vs-HINTS, tolerance sweeps, AUC, usage, costs, summary macros)."""
+        # ------------------------------------------------------------ main table
+        out.append("\\newcommand{\\cawcmain" + SUF + "}{")
         out.append("\\begin{tabular}{llcccccc}\n\\toprule")
-        out.append("Solver & Method & $\\varepsilon{=}10^{-2}$ & $\\varepsilon{=}10^{-3}$ & $\\varepsilon{=}h^2$ & "
-                   "$\\varepsilon{=}10^{-5}$ & $\\varepsilon{=}10^{-6}$ & $\\varepsilon{=}10^{-8}$ \\\\ \\midrule")
-        for spec in SOLVER_ORDER:
-            keys = [k for k in R if k[0] == eq and k[1] == MAIN_N and k[2] == spec and not k[3]]
-            if not keys:
-                continue
-            d, g = R[keys[0]]
-            P = g["policies"]
-            base = P["classical"]
-            pols = ["classical", "hints25", "hints10", "hints5", "hints50", "greedy", "oracle", "router"]
-            for pi, pol in enumerate(pols):
-                if pol not in P:
+        out.append("Equation & Solver & Solver only & HINTS ($\\tau{=}25$) & HINTS (best $\\tau$) & "
+                   "Greedy oracle & Cost-aware oracle & Learned router (ours) \\\\ \\midrule")
+        for eq in EQS:
+            first = True
+            for spec in SOLVER_ORDER:
+                keys = [k for k in R if k[0] == eq and k[1] == N_ and k[2] == spec and not k[3]]
+                if not keys:
                     continue
-                row = [SOLVER_NAMES[spec] if pi == 0 else "", POL_NAMES[pol]]
-                for tol in [1e-2, 1e-3, d["h2"], 1e-5, 1e-6, 1e-8]:
-                    key = tkey(d, tol)
-                    row.append(cell_time(P[pol], base, key))
-                if pol == "oracle":
-                    row = [row[0]] + [f"\\textit{{{c}}}" for c in row[1:]]
+                d, g = R[keys[0]]
+                N = keys[0][1]
+                key = tkey(d, d["h2"])
+                P = g["policies"]
+                base = P["classical"]
+                # best fixed tau by median time
+                taus = [p for p in P if p.startswith("hints")]
+                best_tau = min(taus, key=lambda p: np.median(times(P[p], key)))
+                # deployable comparison: router vs every HINTS and classical
+                t_r = times(P["router"], key)
+                best_dep = "router"
+                for p in taus + ["classical"]:
+                    if np.median(times(P[p], key)) < np.median(t_r):
+                        best_dep = p
+                row = [eq if first else "", SOLVER_NAMES[spec],
+                       cell_time(base, base, key),
+                       cell_time(P["hints25"], base, key, bold=(best_dep == "hints25")),
+                       cell_time(P[best_tau], base, key, bold=(best_dep == best_tau)).replace(
+                           ")", f"; $\\tau{{=}}{best_tau[5:]}$)", 1),
+                       cell_time(P["greedy"], base, key) if "greedy" in P else "--",
+                       "\\textit{" + cell_time(P["oracle"], base, key) + "}",
+                       cell_time(P["router"], base, key, bold=(best_dep == "router"))]
+                out.append(" & ".join(row) + " \\\\")
+                first = False
+            if eq != EQS[-1] and any(k[0] == EQS[EQS.index(eq)+1] for k in R):
+                out.append("\\midrule")
+        out.append("\\bottomrule\n\\end{tabular}}")
+
+        # -------------------------------------------- router vs HINTS speedup table
+        out.append("\\newcommand{\\cavshints" + SUF + "}{")
+        out.append("\\begin{tabular}{llcccccc}\n\\toprule")
+        out.append("& & \\multicolumn{3}{c}{vs.\\ HINTS ($\\tau{=}25$)} & \\multicolumn{3}{c}{vs.\\ best fixed $\\tau$} \\\\")
+        out.append("\\cmidrule(lr){3-5}\\cmidrule(lr){6-8}")
+        out.append("Equation & Solver & $\\varepsilon{=}10^{-3}$ & $\\varepsilon{=}h^2$ & $\\varepsilon{=}10^{-8}$ & "
+                   "$\\varepsilon{=}10^{-3}$ & $\\varepsilon{=}h^2$ & $\\varepsilon{=}10^{-8}$ \\\\ \\midrule")
+        for eq in EQS:
+            first = True
+            for spec in SOLVER_ORDER:
+                keys = [k for k in R if k[0] == eq and k[1] == N_ and k[2] == spec and not k[3]]
+                if not keys:
+                    continue
+                d, g = R[keys[0]]
+                P = g["policies"]
+                taus = [p for p in P if p.startswith("hints")]
+                cells = []
+                for ref in ["hints25", "best"]:
+                    for tol in [1e-3, d["h2"], 1e-8]:
+                        key = tkey(d, tol)
+                        t_r = times(P["router"], key)
+                        if ref == "best":
+                            bt = min(taus, key=lambda p: np.median(times(P[p], key)))
+                            t_h = times(P[bt], key)
+                            lab = f" ($\\tau{{=}}{bt[5:]}$)"
+                        else:
+                            t_h = times(P["hints25"], key)
+                            lab = ""
+                        sp, r = paired_speedup(t_h, t_r)
+                        ok = np.isfinite(r) & (r > 0)
+                        p = wilcoxon(np.log(r[ok]), alternative="greater").pvalue if ok.sum() >= 8 and not np.allclose(r[ok], 1.0) else 1.0
+                        s = fmt_sp(sp) + lab
+                        if sp >= 1.10 and p < 0.01:
+                            s = f"\\textbf{{{s}}}"
+                        cells.append(s)
+                out.append(" & ".join([eq if first else "", SOLVER_NAMES[spec]] + cells) + " \\\\")
+                first = False
+            if eq != EQS[-1] and any(k[0] == EQS[EQS.index(eq)+1] for k in R):
+                out.append("\\midrule")
+        out.append("\\bottomrule\n\\end{tabular}}")
+
+        # ----------------------------------------------------- tolerance sweeps
+        for eq in EQS:
+            out.append(f"\\newcommand{{\\cawctol{eq.lower().replace('diff','')}{SUF}}}{{")
+            out.append("\\begin{tabular}{llcccccc}\n\\toprule")
+            out.append("Solver & Method & $\\varepsilon{=}10^{-2}$ & $\\varepsilon{=}10^{-3}$ & $\\varepsilon{=}h^2$ & "
+                       "$\\varepsilon{=}10^{-5}$ & $\\varepsilon{=}10^{-6}$ & $\\varepsilon{=}10^{-8}$ \\\\ \\midrule")
+            for spec in SOLVER_ORDER:
+                keys = [k for k in R if k[0] == eq and k[1] == N_ and k[2] == spec and not k[3]]
+                if not keys:
+                    continue
+                d, g = R[keys[0]]
+                P = g["policies"]
+                base = P["classical"]
+                pols = ["classical", "hints25", "hints10", "hints5", "hints50", "greedy", "oracle", "router"]
+                for pi, pol in enumerate(pols):
+                    if pol not in P:
+                        continue
+                    row = [SOLVER_NAMES[spec] if pi == 0 else "", POL_NAMES[pol]]
+                    for tol in [1e-2, 1e-3, d["h2"], 1e-5, 1e-6, 1e-8]:
+                        key = tkey(d, tol)
+                        row.append(cell_time(P[pol], base, key))
+                    if pol == "oracle":
+                        row = [row[0]] + [f"\\textit{{{c}}}" for c in row[1:]]
+                    out.append(" & ".join(row) + " \\\\")
+                out.append("\\midrule" if spec != SOLVER_ORDER[-1] else "\\bottomrule")
+            out.append("\\end{tabular}}")
+
+        # ------------------------------------------- AUC / final error (paper style)
+        T = None
+        eqs_present = [eq for eq in EQS if any(k[0] == eq and not k[3] for k in R)]
+        out.append("\\newcommand{\\caauc" + SUF + "}{")
+        out.append("\\begin{tabular}{l" + "ccc" * len(eqs_present) + "}\n\\toprule")
+        out.append("& " + " & ".join(f"\\multicolumn{{3}}{{c}}{{{EQ_NAMES[eq]}}}" for eq in eqs_present) + " \\\\ "
+                   + "".join(f"\\cmidrule(lr){{{2+3*i}-{4+3*i}}}" for i in range(len(eqs_present))))
+        out.append("Method & " + " & ".join("$\\|e^{(T)}_h\\|/\\|u_h\\|$ & AUC & $p$" for _ in eqs_present) + " \\\\ \\midrule")
+        for spec in SOLVER_ORDER:
+            have = [(eq, R[[k for k in R if k[0] == eq and k[1] == N_ and k[2] == spec and not k[3]][0]])
+                    for eq in EQS if [k for k in R if k[0] == eq and k[1] == N_ and k[2] == spec and not k[3]]]
+            if not have:
+                continue
+            T = have[0][1][0]["args"]["T"]
+            out.append(f"\\multicolumn{{{1+3*len(eqs_present)}}}{{c}}{{{SOLVER_NAMES[spec]}-related solvers}} \\\\ \\midrule")
+            for pol in ["classical", "hints25", "router", "oracle"]:
+                row = [POL_NAMES[pol]]
+                for eq in eqs_present:
+                    m = dict(have).get(eq)
+                    if m is None:
+                        row += ["--", "--", "--"]
+                        continue
+                    d, g = m
+                    P = g["policies"]
+                    if pol not in P:
+                        row += ["--", "--", "--"]
+                        continue
+                    err = np.array([r["err_T"] for r in P[pol]])
+                    auc = np.array([r["auc_T"] for r in P[pol]])
+                    auc_r = np.array([r["auc_T"] for r in P["router"]])
+                    def ms(x):
+                        med = np.mean(x)
+                        se = np.std(x, ddof=1) / math.sqrt(len(x))
+                        return f"{med:.2e} ({se:.1e})"
+                    bold = pol == "router" and all(np.mean(auc) <= np.mean(np.array([r["auc_T"] for r in P[q]]))
+                                                    for q in ["classical", "hints25"])
+                    cells = [ms(err), ms(auc)]
+                    if pol in ("classical", "hints25"):
+                        p = ttest_rel(auc, auc_r, alternative="greater").pvalue if not np.allclose(auc, auc_r) else 1.0
+                        cells.append(pval_str(p))
+                    else:
+                        cells.append("-")
+                    if bold:
+                        cells = [f"\\textbf{{{c}}}" for c in cells[:2]] + cells[2:]
+                    if pol == "oracle":
+                        cells = [f"\\textit{{{c}}}" for c in cells]
+                    row += cells
                 out.append(" & ".join(row) + " \\\\")
             out.append("\\midrule" if spec != SOLVER_ORDER[-1] else "\\bottomrule")
         out.append("\\end{tabular}}")
+        if SUF == "":
+            out.append(f"\\newcommand{{\\caT}}{{{T}}}")
+            out.append(f"\\newcommand{{\\caN}}{{{N}}}")
 
-    # ------------------------------------------- AUC / final error (paper style)
-    T = None
-    eqs_present = [eq for eq in EQS if any(k[0] == eq and not k[3] for k in R)]
-    out.append("\\newcommand{\\caauc}{")
-    out.append("\\begin{tabular}{l" + "ccc" * len(eqs_present) + "}\n\\toprule")
-    out.append("& " + " & ".join(f"\\multicolumn{{3}}{{c}}{{{EQ_NAMES[eq]}}}" for eq in eqs_present) + " \\\\ "
-               + "".join(f"\\cmidrule(lr){{{2+3*i}-{4+3*i}}}" for i in range(len(eqs_present))))
-    out.append("Method & " + " & ".join("$\\|e^{(T)}_h\\|/\\|u_h\\|$ & AUC & $p$" for _ in eqs_present) + " \\\\ \\midrule")
-    for spec in SOLVER_ORDER:
-        have = [(eq, R[[k for k in R if k[0] == eq and k[1] == MAIN_N and k[2] == spec and not k[3]][0]])
-                for eq in EQS if [k for k in R if k[0] == eq and k[1] == MAIN_N and k[2] == spec and not k[3]]]
-        if not have:
-            continue
-        T = have[0][1][0]["args"]["T"]
-        out.append(f"\\multicolumn{{{1+3*len(eqs_present)}}}{{c}}{{{SOLVER_NAMES[spec]}-related solvers}} \\\\ \\midrule")
-        for pol in ["classical", "hints25", "router", "oracle"]:
-            row = [POL_NAMES[pol]]
-            for eq in eqs_present:
-                m = dict(have).get(eq)
-                if m is None:
-                    row += ["--", "--", "--"]
+        # ------------------------------------------------ usage / iteration counts
+        out.append("\\newcommand{\\causage" + SUF + "}{")
+        out.append("\\begin{tabular}{llcccccc}\n\\toprule")
+        out.append("& & \\multicolumn{2}{c}{HINTS ($\\tau{=}25$)} & \\multicolumn{2}{c}{Cost-aware oracle} & "
+                   "\\multicolumn{2}{c}{Learned router} \\\\")
+        out.append("\\cmidrule(lr){3-4}\\cmidrule(lr){5-6}\\cmidrule(lr){7-8}")
+        out.append("Equation & Solver & iters & NO calls & iters & NO calls & iters & NO calls \\\\ \\midrule")
+        for eq in EQS:
+            first = True
+            for spec in SOLVER_ORDER:
+                keys = [k for k in R if k[0] == eq and k[1] == N_ and k[2] == spec and not k[3]]
+                if not keys:
                     continue
-                d, g = m
+                d, g = R[keys[0]]
+                key = tkey(d, d["h2"])
                 P = g["policies"]
-                if pol not in P:
-                    row += ["--", "--", "--"]
+                cells = []
+                for pol in ["hints25", "oracle", "router"]:
+                    it = iters(P[pol], key)
+                    nno = np.array([np.nan if r["tol"][key]["no_calls"] is None else r["tol"][key]["no_calls"] for r in P[pol]])
+                    cells += [f"{np.median(it):.0f}", f"{np.nanmedian(nno):.0f}"]
+                out.append(" & ".join([eq if first else "", SOLVER_NAMES[spec]] + cells) + " \\\\")
+                first = False
+            if eq != EQS[-1] and any(k[0] == EQS[EQS.index(eq)+1] for k in R):
+                out.append("\\midrule")
+        out.append("\\bottomrule\n\\end{tabular}}")
+
+        # ------------------------------------------------------------- costs
+        out.append("\\newcommand{\\cacosts" + SUF + "}{")
+        out.append("\\begin{tabular}{llcccc}\n\\toprule")
+        out.append("Equation & Solver & classical iteration & corrector iteration & $m_{\\text{solver}}$ & $m_{\\text{NO}}$ \\\\ \\midrule")
+        for eq in EQS:
+            first = True
+            for spec in SOLVER_ORDER:
+                keys = [k for k in R if k[0] == eq and k[1] == N_ and k[2] == spec and not k[3]]
+                if not keys:
                     continue
-                err = np.array([r["err_T"] for r in P[pol]])
-                auc = np.array([r["auc_T"] for r in P[pol]])
-                auc_r = np.array([r["auc_T"] for r in P["router"]])
-                def ms(x):
-                    med = np.mean(x)
-                    se = np.std(x, ddof=1) / math.sqrt(len(x))
-                    return f"{med:.2e} ({se:.1e})"
-                bold = pol == "router" and all(np.mean(auc) <= np.mean(np.array([r["auc_T"] for r in P[q]]))
-                                                for q in ["classical", "hints25"])
-                cells = [ms(err), ms(auc)]
-                if pol in ("classical", "hints25"):
-                    p = ttest_rel(auc, auc_r, alternative="greater").pvalue if not np.allclose(auc, auc_r) else 1.0
-                    cells.append(pval_str(p))
-                else:
-                    cells.append("-")
-                if bold:
-                    cells = [f"\\textbf{{{c}}}" for c in cells[:2]] + cells[2:]
-                if pol == "oracle":
-                    cells = [f"\\textit{{{c}}}" for c in cells]
-                row += cells
-            out.append(" & ".join(row) + " \\\\")
-        out.append("\\midrule" if spec != SOLVER_ORDER[-1] else "\\bottomrule")
-    out.append("\\end{tabular}}")
-    out.append(f"\\newcommand{{\\caT}}{{{T}}}")
-    out.append(f"\\newcommand{{\\caN}}{{{N}}}")
+                d, g = R[keys[0]]
+                c = g["costs"]
+                out.append(" & ".join([eq if first else "", SOLVER_NAMES[spec], f"{c[spec]*1e6:.0f}\\,$\\mu$s",
+                                       f"{c['no']*1e6:.0f}\\,$\\mu$s", str(g["m"][0]), str(g["m"][-1])]) + " \\\\")
+                first = False
+            if eq != EQS[-1] and any(k[0] == EQS[EQS.index(eq)+1] for k in R):
+                out.append("\\midrule")
+        out.append("\\bottomrule\n\\end{tabular}}")
 
-    # ------------------------------------------------ usage / iteration counts
-    out.append("\\newcommand{\\causage}{")
-    out.append("\\begin{tabular}{llcccccc}\n\\toprule")
-    out.append("& & \\multicolumn{2}{c}{HINTS ($\\tau{=}25$)} & \\multicolumn{2}{c}{Cost-aware oracle} & "
-               "\\multicolumn{2}{c}{Learned router} \\\\")
-    out.append("\\cmidrule(lr){3-4}\\cmidrule(lr){5-6}\\cmidrule(lr){7-8}")
-    out.append("Equation & Solver & iters & NO calls & iters & NO calls & iters & NO calls \\\\ \\midrule")
-    for eq in EQS:
-        first = True
-        for spec in SOLVER_ORDER:
-            keys = [k for k in R if k[0] == eq and k[1] == MAIN_N and k[2] == spec and not k[3]]
-            if not keys:
-                continue
-            d, g = R[keys[0]]
-            key = tkey(d, d["h2"])
-            P = g["policies"]
-            cells = []
-            for pol in ["hints25", "oracle", "router"]:
-                it = iters(P[pol], key)
-                nno = np.array([np.nan if r["tol"][key]["no_calls"] is None else r["tol"][key]["no_calls"] for r in P[pol]])
-                cells += [f"{np.median(it):.0f}", f"{np.nanmedian(nno):.0f}"]
-            out.append(" & ".join([eq if first else "", SOLVER_NAMES[spec]] + cells) + " \\\\")
-            first = False
-        if eq != EQS[-1] and any(k[0] == EQS[EQS.index(eq)+1] for k in R):
-            out.append("\\midrule")
-    out.append("\\bottomrule\n\\end{tabular}}")
+        # ------------------------------------------ summary macros for the text
 
-    # ------------------------------------------------------------- costs
-    out.append("\\newcommand{\\cacosts}{")
-    out.append("\\begin{tabular}{llcccc}\n\\toprule")
-    out.append("Equation & Solver & classical iteration & corrector iteration & $m_{\\text{solver}}$ & $m_{\\text{NO}}$ \\\\ \\midrule")
-    for eq in EQS:
-        first = True
-        for spec in SOLVER_ORDER:
-            keys = [k for k in R if k[0] == eq and k[1] == MAIN_N and k[2] == spec and not k[3]]
-            if not keys:
-                continue
-            d, g = R[keys[0]]
-            c = g["costs"]
-            out.append(" & ".join([eq if first else "", SOLVER_NAMES[spec], f"{c[spec]*1e6:.0f}\\,$\\mu$s",
-                                   f"{c['no']*1e6:.0f}\\,$\\mu$s", str(g["m"][0]), str(g["m"][-1])]) + " \\\\")
-            first = False
-        if eq != EQS[-1] and any(k[0] == EQS[EQS.index(eq)+1] for k in R):
-            out.append("\\midrule")
-    out.append("\\bottomrule\n\\end{tabular}}")
+        summ = {"Solver": [], "Hints": [], "Best": [], "SolverDeep": [], "HintsDeep": [], "BestDeep": [],
+                "OracleRatio": []}
+        for eq in EQS:
+            for spec in SOLVER_ORDER:
+                keys = [k for k in R if k[0] == eq and k[1] == N_ and k[2] == spec and not k[3]]
+                if not keys:
+                    continue
+                d, g = R[keys[0]]
+                P = g["policies"]
+                taus = [p for p in P if p.startswith("hints")]
+                for tol, suf in [(d["h2"], ""), (1e-8, "Deep")]:
+                    key = tkey(d, tol)
+                    t_r = times(P["router"], key)
+                    summ["Solver" + suf].append(paired_speedup(times(P["classical"], key), t_r)[0])
+                    summ["Hints" + suf].append(paired_speedup(times(P["hints25"], key), t_r)[0])
+                    bt = min(taus, key=lambda p: np.median(times(P[p], key)))
+                    summ["Best" + suf].append(paired_speedup(times(P[bt], key), t_r)[0])
+                key = tkey(d, d["h2"])
+                summ["OracleRatio"].append(np.median(times(P["router"], key)) / np.median(times(P["oracle"], key)))
+        for name, vals in summ.items():
+            rng_macro("caSp" + name + SUF, vals)
+        n_cells = len(summ["Solver"])
+        out.append(f"\\newcommand{{\\caNumCells{SUF}}}{{{n_cells}}}")
+        out.append(f"\\newcommand{{\\caCellsRouterBeatsBest{SUF}}}{{{sum(v >= 1.0 for v in summ['Best'])}}}")
+        out.append(f"\\newcommand{{\\caCellsRouterBeatsHints{SUF}}}{{{sum(v >= 1.0 for v in summ['Hints'])}}}")
+
+
+    for N_, SUF in [(128, ""), (256, "B"), (512, "C")]:
+        if any(k[1] == N_ and not k[3] for k in R):
+            grid_tables(N_, SUF)
 
     # ------------------------------------------------------------- ensembles
     ens_keys = [k for k in R if k[3]]
@@ -410,41 +456,6 @@ def main():
             if eq == "Poisson":
                 out.append("\\midrule")
         out.append("\\bottomrule\n\\end{tabular}}")
-
-    # ------------------------------------------ summary macros for the text
-    def rng_macro(name, vals):
-        vals = [v for v in vals if np.isfinite(v)]
-        if not vals:
-            return
-        lo, hi = min(vals), max(vals)
-        out.append(f"\\newcommand{{\\{name}Min}}{{{fmt_sp(lo)}}}")
-        out.append(f"\\newcommand{{\\{name}Max}}{{{fmt_sp(hi)}}}")
-
-    summ = {"Solver": [], "Hints": [], "Best": [], "SolverDeep": [], "HintsDeep": [], "BestDeep": [],
-            "OracleRatio": []}
-    for eq in EQS:
-        for spec in SOLVER_ORDER:
-            keys = [k for k in R if k[0] == eq and k[1] == MAIN_N and k[2] == spec and not k[3]]
-            if not keys:
-                continue
-            d, g = R[keys[0]]
-            P = g["policies"]
-            taus = [p for p in P if p.startswith("hints")]
-            for tol, suf in [(d["h2"], ""), (1e-8, "Deep")]:
-                key = tkey(d, tol)
-                t_r = times(P["router"], key)
-                summ["Solver" + suf].append(paired_speedup(times(P["classical"], key), t_r)[0])
-                summ["Hints" + suf].append(paired_speedup(times(P["hints25"], key), t_r)[0])
-                bt = min(taus, key=lambda p: np.median(times(P[p], key)))
-                summ["Best" + suf].append(paired_speedup(times(P[bt], key), t_r)[0])
-            key = tkey(d, d["h2"])
-            summ["OracleRatio"].append(np.median(times(P["router"], key)) / np.median(times(P["oracle"], key)))
-    for name, vals in summ.items():
-        rng_macro("caSp" + name, vals)
-    n_cells = len(summ["Solver"])
-    out.append(f"\\newcommand{{\\caNumCells}}{{{n_cells}}}")
-    out.append(f"\\newcommand{{\\caCellsRouterBeatsBest}}{{{sum(v >= 1.0 for v in summ['Best'])}}}")
-    out.append(f"\\newcommand{{\\caCellsRouterBeatsHints}}{{{sum(v >= 1.0 for v in summ['Hints'])}}}")
 
     # ------------------------------------------------ strong classical baselines
     BASE_NAMES = {"fft": "FFT direct solve", "mg": "Multigrid V(2,2) alone", "cg": "CG",

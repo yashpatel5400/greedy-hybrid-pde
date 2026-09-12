@@ -179,6 +179,115 @@ The comparisons above are against the stationary solvers of \Cref{sec:experiment
 \label{tab:ca_amort}
 \end{table}
 
+\subsection{Complete results on the $256\times256$ and $512\times512$ grids}
+\label{sec:wallclock_large}
+
+The tables of \Cref{sec:wallclock_strong} summarise the larger grids at $\varepsilon = h^2$ for two pairings; the following tables repeat the full per-tolerance results of the $128^2$ study (\Cref{tab:ca_main,tab:ca_vshints,tab:ca_usage,tab:ca_costs,tab:ca_tol_poisson,tab:ca_tol_convdiff}) on the $256\times 256$ grid ($32$ test instances, all six pairings) and on the $512\times 512$ grid ($16$ instances; Jacobi, GS, SOR and multigrid pairings; solver-only runs capped at $8000$ iterations and reported as lower bounds). Correctors and routers are retrained per grid with the recipe of \Cref{sec:wallclock}; the corrector's sensor grid stays at $64\times 64$ (band $|k|\le 31$).
+
+\begin{table}[H]
+\color{red}
+\centering
+\caption{$256\times256$: median wall-clock time to $\varepsilon = h^2 = 1.5\times10^{-5}$ ($32$ instances; paired median speedup over solver-only in parentheses; $\dagger n$: $n$ instances did not reach the tolerance within the $40{,}000$-iteration cap, in which case the median time at the cap is given as a lower bound).}
+\resizebox{\textwidth}{!}{\cawcmainB}
+\label{tab:ca_main_256}
+\end{table}
+
+\begin{table}[H]
+\color{red}
+\centering
+\caption{$256\times256$: paired median speedup of the learned router over HINTS ($32$ instances; bold: $\ge1.1\times$ with one-sided Wilcoxon $p<0.01$).}
+\resizebox{0.95\textwidth}{!}{\cavshintsB}
+\label{tab:ca_vshints_256}
+\end{table}
+
+\begin{table}[H]
+\color{red}
+\centering
+\caption{$256\times256$: median number of iterations and corrector calls to reach $\varepsilon = h^2$.}
+\resizebox{0.8\textwidth}{!}{\causageB}
+\label{tab:ca_usage_256}
+\end{table}
+
+\begin{table}[H]
+\color{red}
+\centering
+\caption{$256\times256$: measured single-thread per-iteration costs and macro-action sizes.}
+\resizebox{0.75\textwidth}{!}{\cacostsB}
+\label{tab:ca_costs_256}
+\end{table}
+
+\begin{table}[H]
+\color{red}
+\centering
+\caption{$256\times256$, Poisson: median wall-clock time to relative error $\varepsilon$ for every policy and pairing ($32$ instances).}
+\resizebox{\textwidth}{!}{\cawctolpoissonB}
+\label{tab:ca_tol_poisson_256}
+\end{table}
+
+\begin{table}[H]
+\color{red}
+\centering
+\caption{$256\times256$, convection--diffusion: median wall-clock time to relative error $\varepsilon$ for every policy and pairing ($32$ instances).}
+\resizebox{\textwidth}{!}{\cawctolconvB}
+\label{tab:ca_tol_convdiff_256}
+\end{table}
+
+\begin{table}[H]
+\color{red}
+\centering
+\caption{$256\times256$: strong classical baselines ($32$ instances; paired median speedup of the learned router with its best stationary pairing over each method in parentheses).}
+\resizebox{\textwidth}{!}{\cabaselinesB}
+\label{tab:ca_baselines_256}
+\end{table}
+
+\begin{table}[H]
+\color{red}
+\centering
+\caption{$512\times512$: median wall-clock time to $\varepsilon = h^2 = 3.8\times10^{-6}$ ($16$ instances; Jacobi, GS, SOR and multigrid pairings; solver-only runs capped at $8000$ iterations).}
+\resizebox{\textwidth}{!}{\cawcmainC}
+\label{tab:ca_main_512}
+\end{table}
+
+\begin{table}[H]
+\color{red}
+\centering
+\caption{$512\times512$: paired median speedup of the learned router over HINTS ($16$ instances; bold: $\ge1.1\times$ with $p<0.01$).}
+\resizebox{0.95\textwidth}{!}{\cavshintsC}
+\label{tab:ca_vshints_512}
+\end{table}
+
+\begin{table}[H]
+\color{red}
+\centering
+\caption{$512\times512$: median iterations and corrector calls to $h^2$ (left) and measured per-iteration costs (right).}
+\resizebox{0.48\textwidth}{!}{\causageC}\hfill\resizebox{0.48\textwidth}{!}{\cacostsC}
+\label{tab:ca_usage_512}
+\end{table}
+
+\begin{table}[H]
+\color{red}
+\centering
+\caption{$512\times512$, Poisson: median wall-clock time to relative error $\varepsilon$ for every policy and pairing ($16$ instances).}
+\resizebox{\textwidth}{!}{\cawctolpoissonC}
+\label{tab:ca_tol_poisson_512}
+\end{table}
+
+\begin{table}[H]
+\color{red}
+\centering
+\caption{$512\times512$, convection--diffusion: median wall-clock time to relative error $\varepsilon$ for every policy and pairing ($16$ instances).}
+\resizebox{\textwidth}{!}{\cawctolconvC}
+\label{tab:ca_tol_convdiff_512}
+\end{table}
+
+\begin{table}[H]
+\color{red}
+\centering
+\caption{$512\times512$: strong classical baselines ($16$ instances).}
+\resizebox{\textwidth}{!}{\cabaselinesC}
+\label{tab:ca_baselines_512}
+\end{table}
+
 \subsection{Statistical significance and multi-trial robustness}
 \label{sec:wallclock_stats}
 

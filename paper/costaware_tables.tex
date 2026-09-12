@@ -213,6 +213,376 @@ ConvDiff & Jacobi & 72\,$\mu$s & 658\,$\mu$s & 9 & 1 \\
  & SOR (1.5) & 223\,$\mu$s & 660\,$\mu$s & 3 & 1 \\
 \bottomrule
 \end{tabular}}
+\newcommand{\caSpSolverMin}{238$\times$}
+\newcommand{\caSpSolverMax}{1983$\times$}
+\newcommand{\caSpHintsMin}{2.68$\times$}
+\newcommand{\caSpHintsMax}{10.3$\times$}
+\newcommand{\caSpBestMin}{1.21$\times$}
+\newcommand{\caSpBestMax}{3.22$\times$}
+\newcommand{\caSpSolverDeepMin}{9.72$\times$}
+\newcommand{\caSpSolverDeepMax}{1139$\times$}
+\newcommand{\caSpHintsDeepMin}{1.33$\times$}
+\newcommand{\caSpHintsDeepMax}{5.26$\times$}
+\newcommand{\caSpBestDeepMin}{1.07$\times$}
+\newcommand{\caSpBestDeepMax}{1.81$\times$}
+\newcommand{\caSpOracleRatioMin}{0.98$\times$}
+\newcommand{\caSpOracleRatioMax}{1.06$\times$}
+\newcommand{\caNumCells}{10}
+\newcommand{\caCellsRouterBeatsBest}{10}
+\newcommand{\caCellsRouterBeatsHints}{10}
+\newcommand{\cawcmainB}{
+\begin{tabular}{llcccccc}
+\toprule
+Equation & Solver & Solver only & HINTS ($\tau{=}25$) & HINTS (best $\tau$) & Greedy oracle & Cost-aware oracle & Learned router (ours) \\ \midrule
+Poisson & Jacobi & $>$7.61\,s$^{\dagger 32}$ & 5.95\,ms ($>10^{3}\times$) & 2.47\,ms ($>10^{3}\times$; $\tau{=}5$) & 2.30\,ms ($>10^{3}\times$) & \textit{2.32\,ms ($>10^{3}\times$)} & \textbf{2.38\,ms ($>10^{3}\times$)} \\
+ & Jacobi (0.67) & $>$7.74\,s$^{\dagger 32}$ & 6.41\,ms ($>10^{3}\times$) & 3.43\,ms ($>10^{3}\times$; $\tau{=}5$) & 2.93\,ms ($>10^{3}\times$) & \textit{2.77\,ms ($>10^{3}\times$)} & \textbf{2.83\,ms ($>10^{3}\times$)} \\
+ & GS & 28.83\,s & 22.0\,ms (1316$\times$) & 6.07\,ms (4681$\times$; $\tau{=}5$) & 3.85\,ms (7702$\times$) & \textit{3.78\,ms (7797$\times$)} & \textbf{3.92\,ms (7591$\times$)} \\
+ & SymGS & 26.53\,s & 37.3\,ms (712$\times$) & 8.71\,ms (3052$\times$; $\tau{=}5$) & 4.18\,ms (7002$\times$) & \textit{4.19\,ms (7038$\times$)} & \textbf{4.22\,ms (7027$\times$)} \\
+ & SOR (1.5) & 9.60\,s & 40.7\,ms (235$\times$) & 9.06\,ms (1065$\times$; $\tau{=}5$) & 3.69\,ms (2650$\times$) & \textit{3.51\,ms (2748$\times$)} & \textbf{3.80\,ms (2558$\times$)} \\
+\midrule
+ConvDiff & Jacobi & $>$12.73\,s$^{\dagger 32}$ & 9.37\,ms ($>10^{3}\times$) & 4.95\,ms ($>10^{3}\times$; $\tau{=}10$) & 4.43\,ms ($>10^{3}\times$) & \textit{4.81\,ms ($>10^{3}\times$)} & \textbf{4.76\,ms ($>10^{3}\times$)} \\
+ & Jacobi (0.67) & $>$12.55\,s$^{\dagger 32}$ & 9.31\,ms ($>10^{3}\times$) & \textbf{5.68\,ms ($>10^{3}\times$; $\tau{=}10$)} & 5.93\,ms ($>10^{3}\times$) & \textit{5.94\,ms ($>10^{3}\times$)} & 5.76\,ms ($>10^{3}\times$) \\
+ & GS & 30.05\,s & 31.0\,ms (963$\times$) & 10.5\,ms (2830$\times$; $\tau{=}5$) & 7.20\,ms (4211$\times$) & \textit{7.15\,ms (4238$\times$)} & \textbf{7.05\,ms (4326$\times$)} \\
+ & SymGS & 27.77\,s & 42.3\,ms (653$\times$) & 10.9\,ms (2530$\times$; $\tau{=}5$) & 6.93\,ms (4053$\times$) & \textit{6.89\,ms (4083$\times$)} & \textbf{6.96\,ms (4026$\times$)} \\
+ & SOR (1.5) & 8.46\,s & 46.1\,ms (182$\times$) & 10.6\,ms (785$\times$; $\tau{=}5$) & 5.90\,ms (1416$\times$) & \textit{5.74\,ms (1462$\times$)} & \textbf{5.80\,ms (1444$\times$)} \\
+\bottomrule
+\end{tabular}}
+\newcommand{\cavshintsB}{
+\begin{tabular}{llcccccc}
+\toprule
+& & \multicolumn{3}{c}{vs.\ HINTS ($\tau{=}25$)} & \multicolumn{3}{c}{vs.\ best fixed $\tau$} \\
+\cmidrule(lr){3-5}\cmidrule(lr){6-8}
+Equation & Solver & $\varepsilon{=}10^{-3}$ & $\varepsilon{=}h^2$ & $\varepsilon{=}10^{-8}$ & $\varepsilon{=}10^{-3}$ & $\varepsilon{=}h^2$ & $\varepsilon{=}10^{-8}$ \\ \midrule
+Poisson & Jacobi & \textbf{4.02$\times$} & \textbf{2.52$\times$} & \textbf{1.23$\times$} & \textbf{1.38$\times$ ($\tau{=}5$)} & \textbf{1.56$\times$ ($\tau{=}5$)} & \textbf{1.11$\times$ ($\tau{=}50$)} \\
+ & Jacobi (0.67) & \textbf{4.63$\times$} & \textbf{2.26$\times$} & 1.10$\times$ & \textbf{1.55$\times$ ($\tau{=}5$)} & \textbf{1.73$\times$ ($\tau{=}5$)} & 1.10$\times$ ($\tau{=}25$) \\
+ & GS & \textbf{15.0$\times$} & \textbf{5.77$\times$} & \textbf{1.67$\times$} & \textbf{3.29$\times$ ($\tau{=}5$)} & \textbf{1.70$\times$ ($\tau{=}5$)} & \textbf{1.20$\times$ ($\tau{=}10$)} \\
+ & SymGS & \textbf{27.1$\times$} & \textbf{9.96$\times$} & \textbf{2.97$\times$} & \textbf{5.36$\times$ ($\tau{=}5$)} & \textbf{2.27$\times$ ($\tau{=}5$)} & \textbf{1.22$\times$ ($\tau{=}5$)} \\
+ & SOR (1.5) & \textbf{14.9$\times$} & \textbf{10.9$\times$} & \textbf{2.48$\times$} & \textbf{3.36$\times$ ($\tau{=}5$)} & \textbf{2.33$\times$ ($\tau{=}5$)} & 1.09$\times$ ($\tau{=}10$) \\
+\midrule
+ConvDiff & Jacobi & \textbf{5.13$\times$} & \textbf{1.92$\times$} & \textbf{1.12$\times$} & \textbf{1.55$\times$ ($\tau{=}5$)} & \textbf{1.30$\times$ ($\tau{=}10$)} & 1.08$\times$ ($\tau{=}50$) \\
+ & Jacobi (0.67) & \textbf{5.64$\times$} & \textbf{1.80$\times$} & 1.06$\times$ & \textbf{1.66$\times$ ($\tau{=}5$)} & \textbf{1.25$\times$ ($\tau{=}10$)} & 1.06$\times$ ($\tau{=}25$) \\
+ & GS & \textbf{15.0$\times$} & \textbf{5.52$\times$} & \textbf{1.95$\times$} & \textbf{3.31$\times$ ($\tau{=}5$)} & \textbf{1.53$\times$ ($\tau{=}5$)} & \textbf{1.17$\times$ ($\tau{=}10$)} \\
+ & SymGS & \textbf{25.3$\times$} & \textbf{6.26$\times$} & \textbf{2.63$\times$} & \textbf{4.99$\times$ ($\tau{=}5$)} & \textbf{1.69$\times$ ($\tau{=}5$)} & \textbf{1.18$\times$ ($\tau{=}5$)} \\
+ & SOR (1.5) & \textbf{14.8$\times$} & \textbf{7.99$\times$} & \textbf{2.50$\times$} & \textbf{3.24$\times$ ($\tau{=}5$)} & \textbf{1.96$\times$ ($\tau{=}5$)} & \textbf{1.19$\times$ ($\tau{=}5$)} \\
+\bottomrule
+\end{tabular}}
+\newcommand{\cawctolpoissonB}{
+\begin{tabular}{llcccccc}
+\toprule
+Solver & Method & $\varepsilon{=}10^{-2}$ & $\varepsilon{=}10^{-3}$ & $\varepsilon{=}h^2$ & $\varepsilon{=}10^{-5}$ & $\varepsilon{=}10^{-6}$ & $\varepsilon{=}10^{-8}$ \\ \midrule
+Jacobi & Solver only & 5.65\,s & $>$7.61\,s$^{\dagger 32}$ & $>$7.61\,s$^{\dagger 32}$ & $>$7.61\,s$^{\dagger 32}$ & $>$7.61\,s$^{\dagger 32}$ & $>$7.61\,s$^{\dagger 32}$ \\
+ & HINTS ($\tau{=}25$) & 5.90\,ms (948$\times$) & 5.90\,ms ($>10^{3}\times$) & 5.95\,ms ($>10^{3}\times$) & 5.95\,ms ($>10^{3}\times$) & 6.50\,ms ($>10^{3}\times$) & 85.5\,ms ($>10^{3}\times$) \\
+ & HINTS ($\tau{=}10$) & 3.00\,ms (1824$\times$) & 3.00\,ms ($>10^{3}\times$) & 3.31\,ms ($>10^{3}\times$) & 3.31\,ms ($>10^{3}\times$) & 6.06\,ms ($>10^{3}\times$) & 108.2\,ms ($>10^{3}\times$) \\
+ & HINTS ($\tau{=}5$) & 2.03\,ms (2721$\times$) & 2.07\,ms ($>10^{3}\times$) & 2.47\,ms ($>10^{3}\times$) & 3.21\,ms ($>10^{3}\times$) & 8.72\,ms ($>10^{3}\times$) & 163.1\,ms ($>10^{3}\times$) \\
+ & HINTS ($\tau{=}50$) & 10.4\,ms (536$\times$) & 10.4\,ms ($>10^{3}\times$) & 10.6\,ms ($>10^{3}\times$) & 10.6\,ms ($>10^{3}\times$) & 11.1\,ms ($>10^{3}\times$) & 72.9\,ms ($>10^{3}\times$) \\
+ & Greedy oracle (Alg.~1) & 1.27\,ms (4345$\times$) & 1.28\,ms ($>10^{3}\times$) & 2.30\,ms ($>10^{3}\times$) & 2.68\,ms ($>10^{3}\times$) & 5.50\,ms ($>10^{3}\times$) & 67.2\,ms ($>10^{3}\times$) \\
+ & \textit{Cost-aware oracle} & \textit{1.42\,ms (3889$\times$)} & \textit{1.42\,ms ($>10^{3}\times$)} & \textit{2.32\,ms ($>10^{3}\times$)} & \textit{2.74\,ms ($>10^{3}\times$)} & \textit{5.34\,ms ($>10^{3}\times$)} & \textit{67.0\,ms ($>10^{3}\times$)} \\
+ & Learned router (ours) & 1.46\,ms (3740$\times$) & 1.47\,ms ($>10^{3}\times$) & 2.38\,ms ($>10^{3}\times$) & 2.76\,ms ($>10^{3}\times$) & 5.18\,ms ($>10^{3}\times$) & 73.1\,ms ($>10^{3}\times$) \\
+\midrule
+Jacobi (0.67) & Solver only & $>$7.74\,s$^{\dagger 31}$ & $>$7.74\,s$^{\dagger 32}$ & $>$7.74\,s$^{\dagger 32}$ & $>$7.74\,s$^{\dagger 32}$ & $>$7.74\,s$^{\dagger 32}$ & $>$7.74\,s$^{\dagger 32}$ \\
+ & HINTS ($\tau{=}25$) & 6.02\,ms ($>10^{3}\times$) & 6.02\,ms ($>10^{3}\times$) & 6.41\,ms ($>10^{3}\times$) & 6.45\,ms ($>10^{3}\times$) & 8.13\,ms ($>10^{3}\times$) & 16.8\,ms ($>10^{3}\times$) \\
+ & HINTS ($\tau{=}10$) & 3.06\,ms ($>10^{3}\times$) & 3.06\,ms ($>10^{3}\times$) & 3.54\,ms ($>10^{3}\times$) & 3.87\,ms ($>10^{3}\times$) & 8.78\,ms ($>10^{3}\times$) & 21.9\,ms ($>10^{3}\times$) \\
+ & HINTS ($\tau{=}5$) & 2.08\,ms ($>10^{3}\times$) & 2.10\,ms ($>10^{3}\times$) & 3.43\,ms ($>10^{3}\times$) & 4.50\,ms ($>10^{3}\times$) & 13.7\,ms ($>10^{3}\times$) & 33.6\,ms ($>10^{3}\times$) \\
+ & HINTS ($\tau{=}50$) & 10.6\,ms ($>10^{3}\times$) & 10.6\,ms ($>10^{3}\times$) & 10.6\,ms ($>10^{3}\times$) & 10.6\,ms ($>10^{3}\times$) & 11.0\,ms ($>10^{3}\times$) & 21.1\,ms ($>10^{3}\times$) \\
+ & Greedy oracle (Alg.~1) & 1.29\,ms ($>10^{3}\times$) & 1.30\,ms ($>10^{3}\times$) & 2.93\,ms ($>10^{3}\times$) & 3.59\,ms ($>10^{3}\times$) & 7.67\,ms ($>10^{3}\times$) & 16.2\,ms ($>10^{3}\times$) \\
+ & \textit{Cost-aware oracle} & \textit{1.29\,ms ($>10^{3}\times$)} & \textit{1.30\,ms ($>10^{3}\times$)} & \textit{2.77\,ms ($>10^{3}\times$)} & \textit{3.45\,ms ($>10^{3}\times$)} & \textit{7.19\,ms ($>10^{3}\times$)} & \textit{16.1\,ms ($>10^{3}\times$)} \\
+ & Learned router (ours) & 1.30\,ms ($>10^{3}\times$) & 1.32\,ms ($>10^{3}\times$) & 2.83\,ms ($>10^{3}\times$) & 3.48\,ms ($>10^{3}\times$) & 7.56\,ms ($>10^{3}\times$) & 16.8\,ms ($>10^{3}\times$) \\
+\midrule
+GS & Solver only & 11.78\,s & 17.80\,s & 28.83\,s & 29.94\,s & $>$31.70\,s$^{\dagger 32}$ & $>$31.70\,s$^{\dagger 32}$ \\
+ & HINTS ($\tau{=}25$) & 20.4\,ms (574$\times$) & 20.4\,ms (871$\times$) & 22.0\,ms (1316$\times$) & 22.9\,ms (1307$\times$) & 40.4\,ms ($>10^{3}\times$) & 43.5\,ms ($>10^{3}\times$) \\
+ & HINTS ($\tau{=}10$) & 8.34\,ms (1398$\times$) & 8.34\,ms (2120$\times$) & 9.92\,ms (2899$\times$) & 10.9\,ms (2723$\times$) & 17.3\,ms ($>10^{3}\times$) & 30.4\,ms ($>10^{3}\times$) \\
+ & HINTS ($\tau{=}5$) & 4.49\,ms (2626$\times$) & 4.49\,ms (3981$\times$) & 6.07\,ms (4681$\times$) & 7.23\,ms (4133$\times$) & 14.0\,ms ($>10^{3}\times$) & 31.1\,ms ($>10^{3}\times$) \\
+ & HINTS ($\tau{=}50$) & 39.9\,ms (294$\times$) & 39.9\,ms (445$\times$) & 41.4\,ms (698$\times$) & 42.3\,ms (703$\times$) & 79.5\,ms ($>10^{3}\times$) & 79.8\,ms ($>10^{3}\times$) \\
+ & Greedy oracle (Alg.~1) & 1.34\,ms (8746$\times$) & 1.36\,ms (13154$\times$) & 3.85\,ms (7702$\times$) & 5.37\,ms (5649$\times$) & 11.3\,ms ($>10^{3}\times$) & 25.4\,ms ($>10^{3}\times$) \\
+ & \textit{Cost-aware oracle} & \textit{1.31\,ms (8992$\times$)} & \textit{1.33\,ms (13490$\times$)} & \textit{3.78\,ms (7797$\times$)} & \textit{5.28\,ms (5826$\times$)} & \textit{11.4\,ms ($>10^{3}\times$)} & \textit{25.6\,ms ($>10^{3}\times$)} \\
+ & Learned router (ours) & 1.33\,ms (8750$\times$) & 1.36\,ms (13075$\times$) & 3.92\,ms (7591$\times$) & 5.56\,ms (5508$\times$) & 12.2\,ms ($>10^{3}\times$) & 26.0\,ms ($>10^{3}\times$) \\
+\midrule
+SymGS & Solver only & 10.82\,s & 16.41\,s & 26.53\,s & 27.56\,s & 33.16\,s & 44.30\,s \\
+ & HINTS ($\tau{=}25$) & 36.1\,ms (302$\times$) & 36.1\,ms (457$\times$) & 37.3\,ms (712$\times$) & 37.6\,ms (732$\times$) & 71.9\,ms (462$\times$) & 71.9\,ms (616$\times$) \\
+ & HINTS ($\tau{=}10$) & 14.3\,ms (754$\times$) & 14.3\,ms (1143$\times$) & 15.8\,ms (1669$\times$) & 15.9\,ms (1721$\times$) & 28.5\,ms (1164$\times$) & 34.6\,ms (1277$\times$) \\
+ & HINTS ($\tau{=}5$) & 7.18\,ms (1523$\times$) & 7.18\,ms (2301$\times$) & 8.71\,ms (3052$\times$) & 8.77\,ms (3153$\times$) & 15.5\,ms (2137$\times$) & 29.8\,ms (1493$\times$) \\
+ & HINTS ($\tau{=}50$) & 72.5\,ms (149$\times$) & 72.5\,ms (226$\times$) & 73.3\,ms (359$\times$) & 74.3\,ms (372$\times$) & 144.3\,ms (229$\times$) & 144.4\,ms (306$\times$) \\
+ & Greedy oracle (Alg.~1) & 1.35\,ms (7971$\times$) & 1.36\,ms (11909$\times$) & 4.18\,ms (7002$\times$) & 4.90\,ms (5659$\times$) & 10.7\,ms (3086$\times$) & 24.3\,ms (1817$\times$) \\
+ & \textit{Cost-aware oracle} & \textit{1.33\,ms (8231$\times$)} & \textit{1.35\,ms (12187$\times$)} & \textit{4.19\,ms (7038$\times$)} & \textit{4.95\,ms (5652$\times$)} & \textit{10.5\,ms (3150$\times$)} & \textit{23.8\,ms (1863$\times$)} \\
+ & Learned router (ours) & 1.33\,ms (8089$\times$) & 1.34\,ms (12258$\times$) & 4.22\,ms (7027$\times$) & 4.97\,ms (5654$\times$) & 10.8\,ms (3081$\times$) & 24.4\,ms (1821$\times$) \\
+\midrule
+SOR (1.5) & Solver only & 3.93\,s & 5.94\,s & 9.60\,s & 9.97\,s & 11.97\,s & 15.97\,s \\
+ & HINTS ($\tau{=}25$) & 20.5\,ms (190$\times$) & 20.5\,ms (287$\times$) & 40.7\,ms (235$\times$) & 40.7\,ms (244$\times$) & 40.7\,ms (293$\times$) & 60.9\,ms (261$\times$) \\
+ & HINTS ($\tau{=}10$) & 8.39\,ms (461$\times$) & 8.39\,ms (700$\times$) & 16.4\,ms (577$\times$) & 16.5\,ms (598$\times$) & 17.7\,ms (683$\times$) & 27.2\,ms (592$\times$) \\
+ & HINTS ($\tau{=}5$) & 4.57\,ms (855$\times$) & 4.57\,ms (1299$\times$) & 9.06\,ms (1065$\times$) & 9.20\,ms (1104$\times$) & 14.2\,ms (832$\times$) & 27.4\,ms (577$\times$) \\
+ & HINTS ($\tau{=}50$) & 39.4\,ms (98.9$\times$) & 39.4\,ms (151$\times$) & 78.5\,ms (122$\times$) & 78.8\,ms (126$\times$) & 78.8\,ms (152$\times$) & 104.0\,ms (154$\times$) \\
+ & Greedy oracle (Alg.~1) & 1.30\,ms (3003$\times$) & 1.31\,ms (4507$\times$) & 3.69\,ms (2650$\times$) & 4.46\,ms (2252$\times$) & 10.4\,ms (1142$\times$) & 22.7\,ms (698$\times$) \\
+ & \textit{Cost-aware oracle} & \textit{1.29\,ms (3009$\times$)} & \textit{1.30\,ms (4527$\times$)} & \textit{3.51\,ms (2748$\times$)} & \textit{4.26\,ms (2320$\times$)} & \textit{10.3\,ms (1142$\times$)} & \textit{22.4\,ms (702$\times$)} \\
+ & Learned router (ours) & 1.34\,ms (2896$\times$) & 1.36\,ms (4339$\times$) & 3.80\,ms (2558$\times$) & 4.64\,ms (2126$\times$) & 10.9\,ms (1083$\times$) & 24.2\,ms (654$\times$) \\
+\bottomrule
+\end{tabular}}
+\newcommand{\cawctolconvB}{
+\begin{tabular}{llcccccc}
+\toprule
+Solver & Method & $\varepsilon{=}10^{-2}$ & $\varepsilon{=}10^{-3}$ & $\varepsilon{=}h^2$ & $\varepsilon{=}10^{-5}$ & $\varepsilon{=}10^{-6}$ & $\varepsilon{=}10^{-8}$ \\ \midrule
+Jacobi & Solver only & 8.83\,s & $>$12.73\,s$^{\dagger 26}$ & $>$12.73\,s$^{\dagger 32}$ & $>$12.73\,s$^{\dagger 32}$ & $>$12.73\,s$^{\dagger 32}$ & $>$12.73\,s$^{\dagger 32}$ \\
+ & HINTS ($\tau{=}25$) & 9.15\,ms (967$\times$) & 9.15\,ms ($>10^{3}\times$) & 9.37\,ms ($>10^{3}\times$) & 9.46\,ms ($>10^{3}\times$) & 11.2\,ms ($>10^{3}\times$) & 500.8\,ms ($>10^{3}\times$) \\
+ & HINTS ($\tau{=}10$) & 4.33\,ms (2010$\times$) & 4.37\,ms ($>10^{3}\times$) & 4.95\,ms ($>10^{3}\times$) & 5.24\,ms ($>10^{3}\times$) & 10.3\,ms ($>10^{3}\times$) & 631.6\,ms ($>10^{3}\times$) \\
+ & HINTS ($\tau{=}5$) & 2.73\,ms (3051$\times$) & 2.80\,ms ($>10^{3}\times$) & 4.97\,ms ($>10^{3}\times$) & 6.76\,ms ($>10^{3}\times$) & 14.9\,ms ($>10^{3}\times$) & 869.7\,ms ($>10^{3}\times$) \\
+ & HINTS ($\tau{=}50$) & 17.0\,ms (517$\times$) & 17.0\,ms ($>10^{3}\times$) & 17.3\,ms ($>10^{3}\times$) & 17.3\,ms ($>10^{3}\times$) & 18.5\,ms ($>10^{3}\times$) & 475.6\,ms ($>10^{3}\times$) \\
+ & Greedy oracle (Alg.~1) & 1.55\,ms (5578$\times$) & 1.57\,ms ($>10^{3}\times$) & 4.43\,ms ($>10^{3}\times$) & 5.06\,ms ($>10^{3}\times$) & 9.42\,ms ($>10^{3}\times$) & 436.3\,ms ($>10^{3}\times$) \\
+ & \textit{Cost-aware oracle} & \textit{1.69\,ms (5129$\times$)} & \textit{1.70\,ms ($>10^{3}\times$)} & \textit{4.81\,ms ($>10^{3}\times$)} & \textit{5.42\,ms ($>10^{3}\times$)} & \textit{9.60\,ms ($>10^{3}\times$)} & \textit{437.5\,ms ($>10^{3}\times$)} \\
+ & Learned router (ours) & 1.73\,ms (4987$\times$) & 1.77\,ms ($>10^{3}\times$) & 4.76\,ms ($>10^{3}\times$) & 5.42\,ms ($>10^{3}\times$) & 9.76\,ms ($>10^{3}\times$) & 435.1\,ms ($>10^{3}\times$) \\
+\midrule
+Jacobi (0.67) & Solver only & $>$12.55\,s$^{\dagger 20}$ & $>$12.55\,s$^{\dagger 32}$ & $>$12.55\,s$^{\dagger 32}$ & $>$12.55\,s$^{\dagger 32}$ & $>$12.55\,s$^{\dagger 32}$ & $>$12.55\,s$^{\dagger 32}$ \\
+ & HINTS ($\tau{=}25$) & 9.03\,ms ($>10^{3}\times$) & 9.03\,ms ($>10^{3}\times$) & 9.31\,ms ($>10^{3}\times$) & 9.35\,ms ($>10^{3}\times$) & 14.9\,ms ($>10^{3}\times$) & 30.4\,ms ($>10^{3}\times$) \\
+ & HINTS ($\tau{=}10$) & 4.25\,ms ($>10^{3}\times$) & 4.26\,ms ($>10^{3}\times$) & 5.68\,ms ($>10^{3}\times$) & 7.16\,ms ($>10^{3}\times$) & 15.6\,ms ($>10^{3}\times$) & 34.5\,ms ($>10^{3}\times$) \\
+ & HINTS ($\tau{=}5$) & 2.68\,ms ($>10^{3}\times$) & 2.73\,ms ($>10^{3}\times$) & 7.87\,ms ($>10^{3}\times$) & 9.37\,ms ($>10^{3}\times$) & 21.7\,ms ($>10^{3}\times$) & 47.7\,ms ($>10^{3}\times$) \\
+ & HINTS ($\tau{=}50$) & 16.2\,ms ($>10^{3}\times$) & 16.2\,ms ($>10^{3}\times$) & 16.3\,ms ($>10^{3}\times$) & 16.4\,ms ($>10^{3}\times$) & 17.9\,ms ($>10^{3}\times$) & 33.8\,ms ($>10^{3}\times$) \\
+ & Greedy oracle (Alg.~1) & 1.53\,ms ($>10^{3}\times$) & 1.54\,ms ($>10^{3}\times$) & 5.93\,ms ($>10^{3}\times$) & 6.88\,ms ($>10^{3}\times$) & 13.1\,ms ($>10^{3}\times$) & 26.8\,ms ($>10^{3}\times$) \\
+ & \textit{Cost-aware oracle} & \textit{1.56\,ms ($>10^{3}\times$)} & \textit{1.58\,ms ($>10^{3}\times$)} & \textit{5.94\,ms ($>10^{3}\times$)} & \textit{6.88\,ms ($>10^{3}\times$)} & \textit{13.4\,ms ($>10^{3}\times$)} & \textit{27.5\,ms ($>10^{3}\times$)} \\
+ & Learned router (ours) & 1.53\,ms ($>10^{3}\times$) & 1.61\,ms ($>10^{3}\times$) & 5.76\,ms ($>10^{3}\times$) & 6.65\,ms ($>10^{3}\times$) & 13.0\,ms ($>10^{3}\times$) & 26.9\,ms ($>10^{3}\times$) \\
+\midrule
+GS & Solver only & 11.85\,s & 18.36\,s & 30.05\,s & 31.23\,s & $>$36.70\,s$^{\dagger 26}$ & $>$36.70\,s$^{\dagger 32}$ \\
+ & HINTS ($\tau{=}25$) & 23.5\,ms (501$\times$) & 23.5\,ms (773$\times$) & 31.0\,ms (963$\times$) & 46.0\,ms (666$\times$) & 47.0\,ms ($>10^{3}\times$) & 59.3\,ms ($>10^{3}\times$) \\
+ & HINTS ($\tau{=}10$) & 9.79\,ms (1213$\times$) & 9.79\,ms (1875$\times$) & 17.1\,ms (1695$\times$) & 19.4\,ms (1618$\times$) & 21.3\,ms ($>10^{3}\times$) & 36.7\,ms ($>10^{3}\times$) \\
+ & HINTS ($\tau{=}5$) & 5.27\,ms (2247$\times$) & 5.29\,ms (3468$\times$) & 10.5\,ms (2830$\times$) & 11.4\,ms (2674$\times$) & 19.4\,ms ($>10^{3}\times$) & 39.2\,ms ($>10^{3}\times$) \\
+ & HINTS ($\tau{=}50$) & 46.2\,ms (257$\times$) & 46.2\,ms (397$\times$) & 53.6\,ms (565$\times$) & 71.9\,ms (427$\times$) & 92.8\,ms ($>10^{3}\times$) & 94.2\,ms ($>10^{3}\times$) \\
+ & Greedy oracle (Alg.~1) & 1.55\,ms (7777$\times$) & 1.57\,ms (11258$\times$) & 7.20\,ms (4211$\times$) & 8.15\,ms (3852$\times$) & 16.2\,ms ($>10^{3}\times$) & 31.1\,ms ($>10^{3}\times$) \\
+ & \textit{Cost-aware oracle} & \textit{1.56\,ms (7586$\times$)} & \textit{1.61\,ms (10966$\times$)} & \textit{7.15\,ms (4238$\times$)} & \textit{8.13\,ms (3865$\times$)} & \textit{16.2\,ms ($>10^{3}\times$)} & \textit{31.0\,ms ($>10^{3}\times$)} \\
+ & Learned router (ours) & 1.56\,ms (7414$\times$) & 1.57\,ms (10840$\times$) & 7.05\,ms (4326$\times$) & 7.97\,ms (3960$\times$) & 16.1\,ms ($>10^{3}\times$) & 31.4\,ms ($>10^{3}\times$) \\
+\midrule
+SymGS & Solver only & 10.93\,s & 16.90\,s & 27.77\,s & 28.89\,s & 34.88\,s & 46.85\,s \\
+ & HINTS ($\tau{=}25$) & 39.2\,ms (278$\times$) & 39.2\,ms (429$\times$) & 42.3\,ms (653$\times$) & 43.9\,ms (651$\times$) & 78.0\,ms (446$\times$) & 78.1\,ms (594$\times$) \\
+ & HINTS ($\tau{=}10$) & 15.6\,ms (697$\times$) & 15.6\,ms (1076$\times$) & 18.9\,ms (1464$\times$) & 20.4\,ms (1401$\times$) & 30.9\,ms (1118$\times$) & 41.4\,ms (1143$\times$) \\
+ & HINTS ($\tau{=}5$) & 7.80\,ms (1391$\times$) & 7.80\,ms (2149$\times$) & 10.9\,ms (2530$\times$) & 12.6\,ms (2276$\times$) & 18.5\,ms (1858$\times$) & 34.8\,ms (1345$\times$) \\
+ & HINTS ($\tau{=}50$) & 78.3\,ms (138$\times$) & 78.3\,ms (213$\times$) & 81.4\,ms (341$\times$) & 83.1\,ms (345$\times$) & 156.3\,ms (221$\times$) & 156.3\,ms (298$\times$) \\
+ & Greedy oracle (Alg.~1) & 1.53\,ms (6906$\times$) & 1.58\,ms (10455$\times$) & 6.93\,ms (4053$\times$) & 7.74\,ms (3675$\times$) & 14.1\,ms (2383$\times$) & 28.4\,ms (1616$\times$) \\
+ & \textit{Cost-aware oracle} & \textit{1.52\,ms (7162$\times$)} & \textit{1.56\,ms (10557$\times$)} & \textit{6.89\,ms (4083$\times$)} & \textit{7.71\,ms (3756$\times$)} & \textit{14.1\,ms (2414$\times$)} & \textit{28.4\,ms (1633$\times$)} \\
+ & Learned router (ours) & 1.54\,ms (7007$\times$) & 1.55\,ms (10689$\times$) & 6.96\,ms (4026$\times$) & 7.92\,ms (3739$\times$) & 14.8\,ms (2372$\times$) & 29.6\,ms (1569$\times$) \\
+\midrule
+SOR (1.5) & Solver only & 3.31\,s & 5.14\,s & 8.46\,s & 8.79\,s & 10.59\,s & 14.22\,s \\
+ & HINTS ($\tau{=}25$) & 23.2\,ms (141$\times$) & 23.2\,ms (219$\times$) & 46.1\,ms (182$\times$) & 46.1\,ms (189$\times$) & 46.1\,ms (228$\times$) & 69.0\,ms (204$\times$) \\
+ & HINTS ($\tau{=}10$) & 9.72\,ms (339$\times$) & 9.72\,ms (523$\times$) & 19.1\,ms (435$\times$) & 19.1\,ms (453$\times$) & 23.2\,ms (456$\times$) & 32.5\,ms (443$\times$) \\
+ & HINTS ($\tau{=}5$) & 5.18\,ms (622$\times$) & 5.22\,ms (970$\times$) & 10.6\,ms (785$\times$) & 11.9\,ms (745$\times$) & 17.4\,ms (609$\times$) & 31.2\,ms (449$\times$) \\
+ & HINTS ($\tau{=}50$) & 45.7\,ms (71.2$\times$) & 45.7\,ms (110$\times$) & 91.0\,ms (90.8$\times$) & 91.0\,ms (94.4$\times$) & 91.0\,ms (114$\times$) & 136.7\,ms (102$\times$) \\
+ & Greedy oracle (Alg.~1) & 1.52\,ms (2097$\times$) & 1.56\,ms (3139$\times$) & 5.90\,ms (1416$\times$) & 7.29\,ms (1200$\times$) & 14.3\,ms (733$\times$) & 28.1\,ms (504$\times$) \\
+ & \textit{Cost-aware oracle} & \textit{1.52\,ms (2172$\times$)} & \textit{1.57\,ms (3151$\times$)} & \textit{5.74\,ms (1462$\times$)} & \textit{7.13\,ms (1230$\times$)} & \textit{14.0\,ms (749$\times$)} & \textit{27.5\,ms (516$\times$)} \\
+ & Learned router (ours) & 1.53\,ms (2088$\times$) & 1.57\,ms (3051$\times$) & 5.80\,ms (1444$\times$) & 7.21\,ms (1218$\times$) & 14.2\,ms (740$\times$) & 27.6\,ms (510$\times$) \\
+\bottomrule
+\end{tabular}}
+\newcommand{\cawctolanisoB}{
+\begin{tabular}{llcccccc}
+\toprule
+Solver & Method & $\varepsilon{=}10^{-2}$ & $\varepsilon{=}10^{-3}$ & $\varepsilon{=}h^2$ & $\varepsilon{=}10^{-5}$ & $\varepsilon{=}10^{-6}$ & $\varepsilon{=}10^{-8}$ \\ \midrule
+\end{tabular}}
+\newcommand{\caaucB}{
+\begin{tabular}{lcccccc}
+\toprule
+& \multicolumn{3}{c}{Poisson} & \multicolumn{3}{c}{ConvDiff} \\ \cmidrule(lr){2-4}\cmidrule(lr){5-7}
+Method & $\|e^{(T)}_h\|/\|u_h\|$ & AUC & $p$ & $\|e^{(T)}_h\|/\|u_h\|$ & AUC & $p$ \\ \midrule
+\multicolumn{7}{c}{Jacobi-related solvers} \\ \midrule
+Solver only & 9.35e-01 (3.9e-03) & 2.90e+02 (6.7e-01) & $<10^{-3}$ & 9.11e-01 (6.8e-03) & 2.86e+02 (1.2e+00) & $<10^{-3}$ \\
+HINTS ($\tau{=}25$) & 3.83e-06 (1.7e-06) & 2.39e+01 (5.8e-03) & $<10^{-3}$ & 7.37e-06 (3.1e-06) & 2.39e+01 (1.1e-02) & $<10^{-3}$ \\
+Learned router (ours) & \textbf{3.75e-06 (1.7e-06)} & \textbf{6.36e-03 (2.5e-03)} & - & \textbf{7.22e-06 (3.0e-06)} & \textbf{1.25e-02 (4.5e-03)} & - \\
+Cost-aware oracle & \textit{3.75e-06 (1.7e-06)} & \textit{6.36e-03 (2.5e-03)} & \textit{-} & \textit{7.22e-06 (3.0e-06)} & \textit{1.25e-02 (4.5e-03)} & \textit{-} \\
+\midrule
+\multicolumn{7}{c}{Jacobi (0.67)-related solvers} \\ \midrule
+Solver only & 9.55e-01 (2.9e-03) & 2.93e+02 (4.9e-01) & $<10^{-3}$ & 9.37e-01 (5.2e-03) & 2.90e+02 (9.0e-01) & $<10^{-3}$ \\
+HINTS ($\tau{=}25$) & 8.30e-10 (5.4e-11) & 2.40e+01 (4.3e-03) & $<10^{-3}$ & 8.31e-10 (4.9e-11) & 2.39e+01 (8.6e-03) & $<10^{-3}$ \\
+Learned router (ours) & \textbf{9.46e-10 (5.6e-12)} & \textbf{6.83e-03 (2.6e-03)} & - & \textbf{9.32e-10 (5.0e-12)} & \textbf{1.34e-02 (4.7e-03)} & - \\
+Cost-aware oracle & \textit{9.46e-10 (5.6e-12)} & \textit{6.83e-03 (2.6e-03)} & \textit{-} & \textit{9.32e-10 (5.0e-12)} & \textit{1.34e-02 (4.7e-03)} & \textit{-} \\
+\midrule
+\multicolumn{7}{c}{GS-related solvers} \\ \midrule
+Solver only & 8.80e-01 (6.0e-03) & 2.81e+02 (1.1e+00) & $<10^{-3}$ & 8.34e-01 (1.0e-02) & 2.73e+02 (1.9e+00) & $<10^{-3}$ \\
+HINTS ($\tau{=}25$) & 4.23e-11 (4.8e-12) & 2.39e+01 (1.2e-02) & $<10^{-3}$ & 6.31e-11 (5.1e-12) & 2.38e+01 (2.4e-02) & $<10^{-3}$ \\
+Learned router (ours) & \textbf{8.76e-10 (1.0e-11)} & \textbf{3.29e-03 (1.2e-03)} & - & \textbf{8.75e-10 (1.2e-11)} & \textbf{6.17e-03 (2.2e-03)} & - \\
+Cost-aware oracle & \textit{8.73e-10 (1.0e-11)} & \textit{3.29e-03 (1.2e-03)} & \textit{-} & \textit{8.73e-10 (1.2e-11)} & \textit{6.17e-03 (2.2e-03)} & \textit{-} \\
+\midrule
+\multicolumn{7}{c}{SymGS-related solvers} \\ \midrule
+Solver only & 7.86e-01 (8.3e-03) & 2.65e+02 (1.6e+00) & $<10^{-3}$ & 7.30e-01 (1.3e-02) & 2.55e+02 (2.7e+00) & $<10^{-3}$ \\
+HINTS ($\tau{=}25$) & 8.19e-10 (2.0e-11) & 2.37e+01 (2.2e-02) & $<10^{-3}$ & 8.54e-10 (5.0e-11) & 2.36e+01 (4.1e-02) & $<10^{-3}$ \\
+Learned router (ours) & \textbf{7.78e-10 (2.0e-11)} & \textbf{2.00e-03 (7.6e-04)} & - & \textbf{7.66e-10 (1.9e-11)} & \textbf{3.92e-03 (1.4e-03)} & - \\
+Cost-aware oracle & \textit{7.67e-10 (1.9e-11)} & \textit{2.00e-03 (7.6e-04)} & \textit{-} & \textit{7.80e-10 (1.9e-11)} & \textit{3.92e-03 (1.4e-03)} & \textit{-} \\
+\midrule
+\multicolumn{7}{c}{SOR (1.5)-related solvers} \\ \midrule
+Solver only & 7.06e-01 (9.4e-03) & 2.51e+02 (2.0e+00) & $<10^{-3}$ & 5.89e-01 (1.4e-02) & 2.28e+02 (3.3e+00) & $<10^{-3}$ \\
+HINTS ($\tau{=}25$) & 1.60e-10 (1.5e-11) & 2.36e+01 (3.0e-02) & $<10^{-3}$ & 4.68e-10 (2.9e-11) & 2.33e+01 (6.5e-02) & $<10^{-3}$ \\
+Learned router (ours) & \textbf{8.64e-10 (1.5e-11)} & \textbf{3.17e-03 (1.2e-03)} & - & \textbf{8.48e-10 (1.6e-11)} & \textbf{5.75e-03 (2.0e-03)} & - \\
+Cost-aware oracle & \textit{8.60e-10 (1.4e-11)} & \textit{3.17e-03 (1.2e-03)} & \textit{-} & \textit{8.56e-10 (1.6e-11)} & \textit{5.75e-03 (2.0e-03)} & \textit{-} \\
+\bottomrule
+\end{tabular}}
+\newcommand{\causageB}{
+\begin{tabular}{llcccccc}
+\toprule
+& & \multicolumn{2}{c}{HINTS ($\tau{=}25$)} & \multicolumn{2}{c}{Cost-aware oracle} & \multicolumn{2}{c}{Learned router} \\
+\cmidrule(lr){3-4}\cmidrule(lr){5-6}\cmidrule(lr){7-8}
+Equation & Solver & iters & NO calls & iters & NO calls & iters & NO calls \\ \midrule
+Poisson & Jacobi & 25 & 1 & 6 & 1 & 6 & 1 \\
+ & Jacobi (0.67) & 25 & 1 & 8 & 1 & 8 & 1 \\
+ & GS & 27 & 1 & 4 & 1 & 4 & 1 \\
+ & SymGS & 26 & 1 & 3 & 1 & 3 & 1 \\
+ & SOR (1.5) & 50 & 2 & 4 & 1 & 4 & 1 \\
+\midrule
+ConvDiff & Jacobi & 25 & 1 & 10 & 1 & 10 & 1 \\
+ & Jacobi (0.67) & 25 & 1 & 15 & 1 & 15 & 1 \\
+ & GS & 33 & 1 & 7 & 1 & 7 & 1 \\
+ & SymGS & 27 & 1 & 4 & 1 & 4 & 1 \\
+ & SOR (1.5) & 50 & 2 & 6 & 1 & 6 & 1 \\
+\bottomrule
+\end{tabular}}
+\newcommand{\cacostsB}{
+\begin{tabular}{llcccc}
+\toprule
+Equation & Solver & classical iteration & corrector iteration & $m_{\text{solver}}$ & $m_{\text{NO}}$ \\ \midrule
+Poisson & Jacobi & 167\,$\mu$s & 1004\,$\mu$s & 6 & 1 \\
+ & Jacobi (0.67) & 150\,$\mu$s & 971\,$\mu$s & 6 & 1 \\
+ & GS & 780\,$\mu$s & 1007\,$\mu$s & 1 & 1 \\
+ & SymGS & 1402\,$\mu$s & 931\,$\mu$s & 1 & 1 \\
+ & SOR (1.5) & 771\,$\mu$s & 960\,$\mu$s & 1 & 1 \\
+\midrule
+ConvDiff & Jacobi & 286\,$\mu$s & 1130\,$\mu$s & 4 & 1 \\
+ & Jacobi (0.67) & 288\,$\mu$s & 1147\,$\mu$s & 4 & 1 \\
+ & GS & 855\,$\mu$s & 1077\,$\mu$s & 1 & 1 \\
+ & SymGS & 1551\,$\mu$s & 1114\,$\mu$s & 1 & 1 \\
+ & SOR (1.5) & 813\,$\mu$s & 1032\,$\mu$s & 1 & 1 \\
+\bottomrule
+\end{tabular}}
+\newcommand{\caSpSolverBMin}{1444$\times$}
+\newcommand{\caSpSolverBMax}{7591$\times$}
+\newcommand{\caSpHintsBMin}{1.80$\times$}
+\newcommand{\caSpHintsBMax}{10.9$\times$}
+\newcommand{\caSpBestBMin}{1.25$\times$}
+\newcommand{\caSpBestBMax}{2.33$\times$}
+\newcommand{\caSpSolverDeepBMin}{510$\times$}
+\newcommand{\caSpSolverDeepBMax}{1821$\times$}
+\newcommand{\caSpHintsDeepBMin}{1.06$\times$}
+\newcommand{\caSpHintsDeepBMax}{2.97$\times$}
+\newcommand{\caSpBestDeepBMin}{1.06$\times$}
+\newcommand{\caSpBestDeepBMax}{1.22$\times$}
+\newcommand{\caSpOracleRatioBMin}{0.97$\times$}
+\newcommand{\caSpOracleRatioBMax}{1.08$\times$}
+\newcommand{\caNumCellsB}{10}
+\newcommand{\caCellsRouterBeatsBestB}{10}
+\newcommand{\caCellsRouterBeatsHintsB}{10}
+\newcommand{\cawcmainC}{
+\begin{tabular}{llcccccc}
+\toprule
+Equation & Solver & Solver only & HINTS ($\tau{=}25$) & HINTS (best $\tau$) & Greedy oracle & Cost-aware oracle & Learned router (ours) \\ \midrule
+Poisson & Jacobi & $>$9.85\,s$^{\dagger 16}$ & 87.0\,ms ($>10^{3}\times$) & 87.0\,ms ($>10^{3}\times$; $\tau{=}25$) & 78.2\,ms ($>10^{3}\times$) & \textit{74.2\,ms ($>10^{3}\times$)} & \textbf{78.8\,ms ($>10^{3}\times$)$^{\dagger 2}$} \\
+ & GS & $>$29.96\,s$^{\dagger 16}$ & 142.8\,ms ($>10^{3}\times$) & 142.8\,ms ($>10^{3}\times$; $\tau{=}25$) & 141.4\,ms ($>10^{3}\times$) & \textit{130.0\,ms ($>10^{3}\times$)} & \textbf{131.5\,ms ($>10^{3}\times$)} \\
+ & SOR (1.5) & $>$29.74\,s$^{\dagger 16}$ & 182.7\,ms ($>10^{3}\times$) & 74.4\,ms ($>10^{3}\times$; $\tau{=}5$) & 61.1\,ms ($>10^{3}\times$) & \textit{60.3\,ms ($>10^{3}\times$)} & \textbf{60.7\,ms ($>10^{3}\times$)} \\
+\midrule
+\bottomrule
+\end{tabular}}
+\newcommand{\cavshintsC}{
+\begin{tabular}{llcccccc}
+\toprule
+& & \multicolumn{3}{c}{vs.\ HINTS ($\tau{=}25$)} & \multicolumn{3}{c}{vs.\ best fixed $\tau$} \\
+\cmidrule(lr){3-5}\cmidrule(lr){6-8}
+Equation & Solver & $\varepsilon{=}10^{-3}$ & $\varepsilon{=}h^2$ & $\varepsilon{=}10^{-8}$ & $\varepsilon{=}10^{-3}$ & $\varepsilon{=}h^2$ & $\varepsilon{=}10^{-8}$ \\ \midrule
+Poisson & Jacobi & \textbf{6.37$\times$} & \textbf{1.11$\times$} & 1.00$\times$ & \textbf{1.85$\times$ ($\tau{=}5$)} & \textbf{1.11$\times$ ($\tau{=}25$)} & 1.00$\times$ ($\tau{=}50$) \\
+ & GS & \textbf{19.3$\times$} & \textbf{1.11$\times$} & 1.07$\times$ & \textbf{4.07$\times$ ($\tau{=}5$)} & \textbf{1.11$\times$ ($\tau{=}25$)} & 1.07$\times$ ($\tau{=}25$) \\
+ & SOR (1.5) & \textbf{19.2$\times$} & \textbf{3.10$\times$} & \textbf{1.37$\times$} & \textbf{3.93$\times$ ($\tau{=}5$)} & \textbf{1.24$\times$ ($\tau{=}5$)} & 1.09$\times$ ($\tau{=}10$) \\
+\midrule
+\bottomrule
+\end{tabular}}
+\newcommand{\cawctolpoissonC}{
+\begin{tabular}{llcccccc}
+\toprule
+Solver & Method & $\varepsilon{=}10^{-2}$ & $\varepsilon{=}10^{-3}$ & $\varepsilon{=}h^2$ & $\varepsilon{=}10^{-5}$ & $\varepsilon{=}10^{-6}$ & $\varepsilon{=}10^{-8}$ \\ \midrule
+Jacobi & Solver only & $>$9.85\,s$^{\dagger 16}$ & $>$9.85\,s$^{\dagger 16}$ & $>$9.85\,s$^{\dagger 16}$ & $>$9.85\,s$^{\dagger 16}$ & $>$9.85\,s$^{\dagger 16}$ & $>$9.85\,s$^{\dagger 16}$ \\
+ & HINTS ($\tau{=}25$) & 33.1\,ms ($>10^{3}\times$) & 33.1\,ms ($>10^{3}\times$) & 87.0\,ms ($>10^{3}\times$) & 56.4\,ms ($>10^{3}\times$) & 127.7\,ms ($>10^{3}\times$)$^{\dagger 2}$ & 309.2\,ms ($>10^{3}\times$)$^{\dagger 7}$ \\
+ & HINTS ($\tau{=}10$) & 14.5\,ms ($>10^{3}\times$) & 15.2\,ms ($>10^{3}\times$) & 103.3\,ms ($>10^{3}\times$) & 67.0\,ms ($>10^{3}\times$) & 152.1\,ms ($>10^{3}\times$)$^{\dagger 2}$ & 363.9\,ms ($>10^{3}\times$)$^{\dagger 7}$ \\
+ & HINTS ($\tau{=}5$) & 9.18\,ms ($>10^{3}\times$) & 9.27\,ms ($>10^{3}\times$) & 126.3\,ms ($>10^{3}\times$) & 82.0\,ms ($>10^{3}\times$) & 192.2\,ms ($>10^{3}\times$)$^{\dagger 2}$ & 460.4\,ms ($>10^{3}\times$)$^{\dagger 7}$ \\
+ & HINTS ($\tau{=}50$) & 60.8\,ms ($>10^{3}\times$) & 60.8\,ms ($>10^{3}\times$) & 88.9\,ms ($>10^{3}\times$) & 75.1\,ms ($>10^{3}\times$) & 125.8\,ms ($>10^{3}\times$)$^{\dagger 2}$ & 293.9\,ms ($>10^{3}\times$)$^{\dagger 7}$ \\
+ & Greedy oracle (Alg.~1) & 4.57\,ms ($>10^{3}\times$) & 4.74\,ms ($>10^{3}\times$) & 78.2\,ms ($>10^{3}\times$) & 53.6\,ms ($>10^{3}\times$) & 116.6\,ms ($>10^{3}\times$)$^{\dagger 2}$ & 275.5\,ms ($>10^{3}\times$)$^{\dagger 7}$ \\
+ & \textit{Cost-aware oracle} & \textit{4.62\,ms ($>10^{3}\times$)} & \textit{4.74\,ms ($>10^{3}\times$)} & \textit{74.2\,ms ($>10^{3}\times$)} & \textit{47.2\,ms ($>10^{3}\times$)} & \textit{111.0\,ms ($>10^{3}\times$)$^{\dagger 2}$} & \textit{261.5\,ms ($>10^{3}\times$)$^{\dagger 7}$} \\
+ & Learned router (ours) & 4.80\,ms ($>10^{3}\times$) & 4.86\,ms ($>10^{3}\times$) & 78.8\,ms ($>10^{3}\times$)$^{\dagger 2}$ & 52.6\,ms ($>10^{3}\times$) & 119.4\,ms ($>10^{3}\times$)$^{\dagger 4}$ & 282.9\,ms ($>10^{3}\times$)$^{\dagger 7}$ \\
+\midrule
+GS & Solver only & $>$29.96\,s$^{\dagger 16}$ & $>$29.96\,s$^{\dagger 16}$ & $>$29.96\,s$^{\dagger 16}$ & $>$29.96\,s$^{\dagger 16}$ & $>$29.96\,s$^{\dagger 16}$ & $>$29.96\,s$^{\dagger 16}$ \\
+ & HINTS ($\tau{=}25$) & 92.5\,ms ($>10^{3}\times$) & 92.5\,ms ($>10^{3}\times$) & 142.8\,ms ($>10^{3}\times$) & 107.0\,ms ($>10^{3}\times$) & 210.1\,ms ($>10^{3}\times$) & 439.6\,ms ($>10^{3}\times$) \\
+ & HINTS ($\tau{=}10$) & 37.3\,ms ($>10^{3}\times$) & 37.3\,ms ($>10^{3}\times$) & 147.0\,ms ($>10^{3}\times$) & 96.0\,ms ($>10^{3}\times$) & 214.6\,ms ($>10^{3}\times$) & 465.9\,ms ($>10^{3}\times$) \\
+ & HINTS ($\tau{=}5$) & 19.5\,ms ($>10^{3}\times$) & 20.0\,ms ($>10^{3}\times$) & 162.5\,ms ($>10^{3}\times$) & 107.8\,ms ($>10^{3}\times$) & 238.2\,ms ($>10^{3}\times$) & 522.1\,ms ($>10^{3}\times$) \\
+ & HINTS ($\tau{=}50$) & 183.5\,ms ($>10^{3}\times$) & 183.5\,ms ($>10^{3}\times$) & 212.2\,ms ($>10^{3}\times$) & 190.8\,ms ($>10^{3}\times$) & 346.0\,ms ($>10^{3}\times$) & 478.7\,ms ($>10^{3}\times$) \\
+ & Greedy oracle (Alg.~1) & 4.59\,ms ($>10^{3}\times$) & 4.65\,ms ($>10^{3}\times$) & 141.4\,ms ($>10^{3}\times$) & 95.2\,ms ($>10^{3}\times$) & 221.0\,ms ($>10^{3}\times$) & 447.1\,ms ($>10^{3}\times$) \\
+ & \textit{Cost-aware oracle} & \textit{4.68\,ms ($>10^{3}\times$)} & \textit{4.87\,ms ($>10^{3}\times$)} & \textit{130.0\,ms ($>10^{3}\times$)} & \textit{88.6\,ms ($>10^{3}\times$)} & \textit{190.1\,ms ($>10^{3}\times$)} & \textit{433.0\,ms ($>10^{3}\times$)} \\
+ & Learned router (ours) & 4.66\,ms ($>10^{3}\times$) & 4.70\,ms ($>10^{3}\times$) & 131.5\,ms ($>10^{3}\times$) & 89.1\,ms ($>10^{3}\times$) & 194.5\,ms ($>10^{3}\times$) & 417.8\,ms ($>10^{3}\times$) \\
+\midrule
+SOR (1.5) & Solver only & $>$29.74\,s$^{\dagger 16}$ & $>$29.74\,s$^{\dagger 16}$ & $>$29.74\,s$^{\dagger 16}$ & $>$29.74\,s$^{\dagger 16}$ & $>$29.74\,s$^{\dagger 16}$ & $>$29.74\,s$^{\dagger 16}$ \\
+ & HINTS ($\tau{=}25$) & 93.2\,ms ($>10^{3}\times$) & 93.2\,ms ($>10^{3}\times$) & 182.7\,ms ($>10^{3}\times$) & 129.0\,ms ($>10^{3}\times$) & 187.1\,ms ($>10^{3}\times$) & 269.4\,ms ($>10^{3}\times$) \\
+ & HINTS ($\tau{=}10$) & 37.3\,ms ($>10^{3}\times$) & 37.7\,ms ($>10^{3}\times$) & 82.5\,ms ($>10^{3}\times$) & 78.6\,ms ($>10^{3}\times$) & 108.5\,ms ($>10^{3}\times$) & 214.9\,ms ($>10^{3}\times$) \\
+ & HINTS ($\tau{=}5$) & 18.7\,ms ($>10^{3}\times$) & 18.7\,ms ($>10^{3}\times$) & 74.4\,ms ($>10^{3}\times$) & 49.3\,ms ($>10^{3}\times$) & 107.4\,ms ($>10^{3}\times$) & 237.4\,ms ($>10^{3}\times$) \\
+ & HINTS ($\tau{=}50$) & 185.7\,ms ($>10^{3}\times$) & 185.7\,ms ($>10^{3}\times$) & 355.2\,ms ($>10^{3}\times$) & 209.1\,ms ($>10^{3}\times$) & 368.3\,ms ($>10^{3}\times$) & 376.4\,ms ($>10^{3}\times$) \\
+ & Greedy oracle (Alg.~1) & 4.55\,ms ($>10^{3}\times$) & 4.56\,ms ($>10^{3}\times$) & 61.1\,ms ($>10^{3}\times$) & 41.8\,ms ($>10^{3}\times$) & 88.7\,ms ($>10^{3}\times$) & 186.7\,ms ($>10^{3}\times$) \\
+ & \textit{Cost-aware oracle} & \textit{4.47\,ms ($>10^{3}\times$)} & \textit{4.62\,ms ($>10^{3}\times$)} & \textit{60.3\,ms ($>10^{3}\times$)} & \textit{41.1\,ms ($>10^{3}\times$)} & \textit{89.3\,ms ($>10^{3}\times$)} & \textit{185.9\,ms ($>10^{3}\times$)} \\
+ & Learned router (ours) & 4.62\,ms ($>10^{3}\times$) & 4.69\,ms ($>10^{3}\times$) & 60.7\,ms ($>10^{3}\times$) & 41.5\,ms ($>10^{3}\times$) & 89.1\,ms ($>10^{3}\times$) & 188.5\,ms ($>10^{3}\times$) \\
+\bottomrule
+\end{tabular}}
+\newcommand{\cawctolconvC}{
+\begin{tabular}{llcccccc}
+\toprule
+Solver & Method & $\varepsilon{=}10^{-2}$ & $\varepsilon{=}10^{-3}$ & $\varepsilon{=}h^2$ & $\varepsilon{=}10^{-5}$ & $\varepsilon{=}10^{-6}$ & $\varepsilon{=}10^{-8}$ \\ \midrule
+\end{tabular}}
+\newcommand{\cawctolanisoC}{
+\begin{tabular}{llcccccc}
+\toprule
+Solver & Method & $\varepsilon{=}10^{-2}$ & $\varepsilon{=}10^{-3}$ & $\varepsilon{=}h^2$ & $\varepsilon{=}10^{-5}$ & $\varepsilon{=}10^{-6}$ & $\varepsilon{=}10^{-8}$ \\ \midrule
+\end{tabular}}
+\newcommand{\caaucC}{
+\begin{tabular}{lcccccc}
+\toprule
+& \multicolumn{3}{c}{Poisson} & \multicolumn{3}{c}{ConvDiff} \\ \cmidrule(lr){2-4}\cmidrule(lr){5-7}
+Method & $\|e^{(T)}_h\|/\|u_h\|$ & AUC & $p$ & $\|e^{(T)}_h\|/\|u_h\|$ & AUC & $p$ \\ \midrule
+\multicolumn{7}{c}{Jacobi-related solvers} \\ \midrule
+Solver only & 9.81e-01 (2.5e-03) & 2.97e+02 (4.0e-01) & $<10^{-3}$ & -- & -- & -- \\
+HINTS ($\tau{=}25$) & 2.11e-06 (1.0e-06) & 2.40e+01 (1.5e-03) & $<10^{-3}$ & -- & -- & -- \\
+Learned router (ours) & \textbf{2.07e-06 (1.0e-06)} & \textbf{2.34e-02 (1.0e-02)} & - & -- & -- & -- \\
+Cost-aware oracle & \textit{2.07e-06 (1.0e-06)} & \textit{2.34e-02 (1.0e-02)} & \textit{-} & -- & -- & -- \\
+\midrule
+\multicolumn{7}{c}{GS-related solvers} \\ \midrule
+Solver only & 9.63e-01 (4.4e-03) & 2.94e+02 (7.2e-01) & $<10^{-3}$ & -- & -- & -- \\
+HINTS ($\tau{=}25$) & 9.59e-10 (6.1e-12) & 2.40e+01 (5.7e-03) & $<10^{-3}$ & -- & -- & -- \\
+Learned router (ours) & \textbf{9.63e-10 (5.5e-12)} & \textbf{1.28e-02 (5.5e-03)} & - & -- & -- & -- \\
+Cost-aware oracle & \textit{9.64e-10 (5.2e-12)} & \textit{1.28e-02 (5.5e-03)} & \textit{-} & -- & -- & -- \\
+\midrule
+\multicolumn{7}{c}{SOR (1.5)-related solvers} \\ \midrule
+Solver only & 9.00e-01 (9.4e-03) & 2.84e+02 (1.7e+00) & $<10^{-3}$ & -- & -- & -- \\
+HINTS ($\tau{=}25$) & 8.69e-10 (2.8e-11) & 2.39e+01 (1.7e-02) & $<10^{-3}$ & -- & -- & -- \\
+Learned router (ours) & \textbf{9.19e-10 (1.2e-11)} & \textbf{6.70e-03 (2.9e-03)} & - & -- & -- & -- \\
+Cost-aware oracle & \textit{9.38e-10 (1.0e-11)} & \textit{6.69e-03 (2.9e-03)} & \textit{-} & -- & -- & -- \\
+\bottomrule
+\end{tabular}}
+\newcommand{\causageC}{
+\begin{tabular}{llcccccc}
+\toprule
+& & \multicolumn{2}{c}{HINTS ($\tau{=}25$)} & \multicolumn{2}{c}{Cost-aware oracle} & \multicolumn{2}{c}{Learned router} \\
+\cmidrule(lr){3-4}\cmidrule(lr){5-6}\cmidrule(lr){7-8}
+Equation & Solver & iters & NO calls & iters & NO calls & iters & NO calls \\ \midrule
+Poisson & Jacobi & 65 & 2 & 64 & 1 & 64 & 1 \\
+ & GS & 38 & 1 & 35 & 1 & 35 & 1 \\
+ & SOR (1.5) & 50 & 2 & 17 & 1 & 17 & 2 \\
+\midrule
+\bottomrule
+\end{tabular}}
+\newcommand{\cacostsC}{
+\begin{tabular}{llcccc}
+\toprule
+Equation & Solver & classical iteration & corrector iteration & $m_{\text{solver}}$ & $m_{\text{NO}}$ \\ \midrule
+Poisson & Jacobi & 1072\,$\mu$s & 3363\,$\mu$s & 3 & 1 \\
+ & GS & 3497\,$\mu$s & 3300\,$\mu$s & 1 & 1 \\
+ & SOR (1.5) & 3412\,$\mu$s & 3195\,$\mu$s & 1 & 1 \\
+\midrule
+\bottomrule
+\end{tabular}}
+\newcommand{\caSpHintsCMin}{1.11$\times$}
+\newcommand{\caSpHintsCMax}{3.10$\times$}
+\newcommand{\caSpBestCMin}{1.11$\times$}
+\newcommand{\caSpBestCMax}{1.24$\times$}
+\newcommand{\caSpHintsDeepCMin}{1.00$\times$}
+\newcommand{\caSpHintsDeepCMax}{1.37$\times$}
+\newcommand{\caSpBestDeepCMin}{1.00$\times$}
+\newcommand{\caSpBestDeepCMax}{1.09$\times$}
+\newcommand{\caSpOracleRatioCMin}{1.01$\times$}
+\newcommand{\caSpOracleRatioCMax}{1.06$\times$}
+\newcommand{\caNumCellsC}{3}
+\newcommand{\caCellsRouterBeatsBestC}{3}
+\newcommand{\caCellsRouterBeatsHintsC}{3}
 \newcommand{\caens}{
 \begin{tabular}{llcccc}
 \toprule
@@ -243,23 +613,6 @@ ConvDiff & $\{Jacobi, GS\}$ & 0.089 (0.255) & 0.310 (0.337) & - & - & - & 0.600 
  & $\{Jacobi, GS, SymGS, Jacobi (0.67), SOR (1.5)\}$ & 0.166 (0.302) & 0.028 (0.127) & 0.000 (0.000) & 0.233 (0.375) & 0.000 (0.000) & 0.573 (0.399) \\
 \bottomrule
 \end{tabular}}
-\newcommand{\caSpSolverMin}{238$\times$}
-\newcommand{\caSpSolverMax}{1983$\times$}
-\newcommand{\caSpHintsMin}{2.68$\times$}
-\newcommand{\caSpHintsMax}{10.3$\times$}
-\newcommand{\caSpBestMin}{1.21$\times$}
-\newcommand{\caSpBestMax}{3.22$\times$}
-\newcommand{\caSpSolverDeepMin}{9.72$\times$}
-\newcommand{\caSpSolverDeepMax}{1139$\times$}
-\newcommand{\caSpHintsDeepMin}{1.33$\times$}
-\newcommand{\caSpHintsDeepMax}{5.26$\times$}
-\newcommand{\caSpBestDeepMin}{1.07$\times$}
-\newcommand{\caSpBestDeepMax}{1.81$\times$}
-\newcommand{\caSpOracleRatioMin}{0.98$\times$}
-\newcommand{\caSpOracleRatioMax}{1.06$\times$}
-\newcommand{\caNumCells}{10}
-\newcommand{\caCellsRouterBeatsBest}{10}
-\newcommand{\caCellsRouterBeatsHints}{10}
 \newcommand{\cabaselines}{
 \begin{tabular}{llccccc}
 \toprule
