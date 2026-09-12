@@ -732,6 +732,31 @@ def main():
         out.append("\\midrule")
     out[-1] = "\\bottomrule\n\\end{tabular}}"
 
+    # ---------------------------------------- macros for the main-text sentence
+    vs_mg, vs_kry, fft_ratio, vs_mg_ens = [], [], [], []
+    for (eq, N), d in Bf.items():
+        if N != 128:
+            continue
+        pw = {k[2]: R[k] for k in R if k[0] == eq and k[1] == N and not k[3] and k[2] == "gs"}
+        if not pw:
+            continue
+        dd, g = pw["gs"]
+        key = tkey(dd, dd["h2"])
+        t_r = times(g["policies"]["router"], key)
+        if "mg" in d["methods"]:
+            vs_mg.append(paired_speedup(base_times(d, "mg", dd["h2"]), t_r)[0])
+        kry = "pcg_mg" if eq == "Poisson" else "bicgstab_mg"
+        if kry in d["methods"]:
+            vs_kry.append(paired_speedup(base_times(d, kry, dd["h2"]), t_r)[0])
+        if "fft" in d["methods"]:
+            fft_ratio.append(np.median(t_r) / np.median(base_times(d, "fft", dd["h2"])))
+        mgp = [R[k] for k in R if k[0] == eq and k[1] == N and not k[3] and k[2] == "mg"]
+        if mgp:
+            vs_mg_ens.append(paired_speedup(times(mgp[0][1]["policies"]["classical"], tkey(mgp[0][0], dd["h2"])),
+                                            times(mgp[0][1]["policies"]["router"], tkey(mgp[0][0], dd["h2"])))[0])
+    for name, vals in [("caVsMg", vs_mg), ("caVsKrylov", vs_kry), ("caFftRatio", fft_ratio), ("caVsMgEns", vs_mg_ens)]:
+        rng_macro(name, vals)
+
     # placeholders for macros whose data may not exist yet
     defined = set(re.findall(r"\\newcommand\{\\(\w+)\}", "\n".join(out)))
     for name in ["cabaselines", "cabaselinesB", "cabaselinesC", "caoverheads", "caamort",
@@ -739,6 +764,8 @@ def main():
         if name not in defined:
             out.append(f"\\newcommand{{\\{name}}}{{\\begin{{tabular}}{{c}}(results pending)\\end{{tabular}}}}")
     for name, val in [("caLstmMs", "--"), ("caLstmOverJacobi", "--"), ("caEnsVsPairMin", "--"),
+                      ("caVsMgMin", "--"), ("caVsMgMax", "--"), ("caVsKrylovMin", "--"), ("caVsKrylovMax", "--"),
+                      ("caFftRatioMin", "--"), ("caFftRatioMax", "--"), ("caVsMgEnsMin", "--"), ("caVsMgEnsMax", "--"),
                       ("caEnsVsPairMax", "--"), ("caEnsVsSolverMin", "--"), ("caEnsVsSolverMax", "--"), ("caNumEns", "--")]:
         if name not in defined and not (ens_ratios and name.startswith("caEns")) and not (ens_ratios and name == "caNumEns"):
             out.append(f"\\newcommand{{\\{name}}}{{{val}}}")

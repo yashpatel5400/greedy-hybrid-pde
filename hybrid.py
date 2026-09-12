@@ -41,7 +41,7 @@ from fast_pde import FastStencilPDE, demean, l2, make_solver
 class Env:
     """PDE + operations + costs + macro-action sizes."""
 
-    def __init__(self, pde: FastStencilPDE, solver_specs, corrector, costs=None, unit="max"):
+    def __init__(self, pde: FastStencilPDE, solver_specs, corrector, costs=None, unit="no"):
         self.pde = pde
         self.N = pde.N
         self.specs = list(solver_specs)
@@ -55,16 +55,35 @@ class Env:
         if costs is not None:
             self.set_macro_sizes(unit)
 
-    def set_macro_sizes(self, unit="max"):
+    def set_macro_sizes(self, unit="no"):
+        """Cost-equalised macro-actions. The unit of cost is one corrector call
+        (unit="no"; "max" uses the most expensive operation). Operation j is
+        applied m_j = max(1, round(u / c_j)) times per decision, which
+        equalises costs up to rounding for operations cheaper than the unit;
+        an operation dearer than the unit (e.g. a multigrid cycle) is applied
+        once and its error reduction is compared per unit of cost, i.e. the
+        oracle compares ||e_j||^(u / (m_j c_j)) (exponent 1 when costs match)."""
         c = np.array([self.costs[o] for o in self.ops])
         assert np.all(c > 0)
-        cu = c.max() if unit == "max" else float(unit)
+        if unit == "max":
+            cu = c.max()
+        elif unit == "no":
+            cu = c[self.no_index] if self.no_index is not None else c.max()
+        else:
+            cu = float(unit)
         self.m = [max(1, int(round(cu / cj))) for cj in c]
         self.unit_cost = cu
-        # exponent used by the per-iteration (rate) form of the cost-aware
-        # rule: compare ||e_j||^(c_max/c_j), the geometric extrapolation of the
-        # one-step reduction of operation j over its macro-action
+        mc = np.array(self.m) * c
+        self.macro_exp = (cu / mc).tolist()          # per-macro-action exponent
+        # exponent used by the per-iteration (rate) form of the rule
         self.rate_exp = (cu / c).tolist()
+
+    def macro_score(self, e0, errs):
+        """Cost-normalised errors after each macro-action: exp(exp_j * log(e_j/e0)).
+        argmin gives the cost-aware greedy decision (Alg. 1 when all
+        exponents are 1)."""
+        e0 = max(e0, 1e-300)
+        return [self.macro_exp[k] * math.log(max(errs[k], 1e-300) / e0) for k in range(self.K)]
 
     # -- single operation ----------------------------------------------------
     def apply_op(self, j, u, f, r):
@@ -234,7 +253,7 @@ def run_untimed(env: Env, f, u_truth, policy, max_ops=100000, err_stop=1e-9,
                 j = int(rng.integers(env.K))
         elif policy == "oracle":
             errs = [float(l2(demean(env.apply_macro(k, u, f, r) - u_truth))[0]) for k in range(env.K)]
-            j = int(np.argmin(errs))
+            j = int(np.argmin(env.macro_score(rel_err[-1] * un, errs)))
             m = env.m[j]
             if explore is not None and rng.random() < explore:
                 j = int(rng.integers(env.K))

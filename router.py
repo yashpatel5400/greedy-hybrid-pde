@@ -157,12 +157,14 @@ def collect_states(env: Env, n_inst, rng, behavior=None, eps=0.1, max_epochs=300
             uj = env.apply_op(j, u, f, r) if rate else env.apply_macro(j, u, f, r)
             cands.append(uj)
         errs2 = np.stack([l2(demean(uj - u_star)) ** 2 for uj in cands], axis=1)  # (B, K)
-        if rate:
-            # cost-adjusted errors, computed in the log domain relative to the
-            # current error so the per-state normalisation stays well scaled
-            e0 = np.maximum(rel_err * un, 1e-300)[:, None]
-            logratio = np.log(np.maximum(errs2, 1e-300) / e0 ** 2)          # log(e_j^2/e^2) <= 0
-            errs2 = np.exp(np.array(env.rate_exp)[None, :] * logratio)      # (e_j/e)^(2 c_max/c_j)
+        # cost-adjusted squared errors (e_j/e)^(2 * exponent_j), computed in the
+        # log domain relative to the current error so the per-state
+        # normalisation stays well scaled; exponent = u/(m_j c_j) for
+        # macro-actions (1 when costs match), u/c_j in the per-iteration form
+        e0 = np.maximum(rel_err * un, 1e-300)[:, None]
+        logratio = np.log(np.maximum(errs2, 1e-300) / e0 ** 2)              # log(e_j^2/e^2)
+        expo = np.array(env.rate_exp if rate else env.macro_exp)[None, :]
+        errs2 = np.exp(expo * logratio)
         # normalise per state (scale-free) -- keeps weights O(1)
         lab_err = errs2 / np.maximum(errs2.sum(axis=1, keepdims=True), 1e-300)
         if ep % record_every == 0:
