@@ -49,7 +49,7 @@ The experiments of \Cref{sec:experiments} compare methods per iteration, which f
 \begin{table}[H]
 \color{red}
 \centering
-\caption{Median number of iterations and corrector calls needed to reach $\varepsilon = h^2$.}
+\caption{Median number of iterations and corrector calls needed to reach $\varepsilon = h^2$ on the $\caN\times\caN$ grid.}
 \resizebox{0.8\textwidth}{!}{\causage}
 \label{tab:ca_usage}
 \end{table}
@@ -57,7 +57,7 @@ The experiments of \Cref{sec:experiments} compare methods per iteration, which f
 \begin{table}[H]
 \color{red}
 \centering
-\caption{Measured single-thread per-iteration costs (residual + update) and the resulting macro-action sizes $m_j = \mathrm{round}(c_{\max}/c_j)$.}
+\caption{Measured single-thread per-iteration costs (residual + update) on the $\caN\times\caN$ grid and the resulting macro-action sizes $m_j = \max\{1,\mathrm{round}(u/c_j)\}$ ($u$: corrector call).}
 \resizebox{0.75\textwidth}{!}{\cacosts}
 \label{tab:ca_costs}
 \end{table}
@@ -65,7 +65,7 @@ The experiments of \Cref{sec:experiments} compare methods per iteration, which f
 \begin{table}[H]
 \color{red}
 \centering
-\caption{Poisson: median wall-clock time to relative error $\varepsilon$ for every policy and pairing (paired median speedup over solver-only in parentheses; $\dagger n$: $n$ instances did not reach the tolerance within the iteration cap).}
+\caption{Poisson on the $\caN\times\caN$ grid: median wall-clock time to relative error $\varepsilon$ for every policy and pairing ($64$ instances; paired median speedup over solver-only in parentheses; $\dagger n$: $n$ instances did not reach the tolerance within the iteration cap).}
 \resizebox{\textwidth}{!}{\cawctolpoisson}
 \label{tab:ca_tol_poisson}
 \end{table}
@@ -73,7 +73,7 @@ The experiments of \Cref{sec:experiments} compare methods per iteration, which f
 \begin{table}[H]
 \color{red}
 \centering
-\caption{Convection--diffusion: median wall-clock time to relative error $\varepsilon$ for every policy and pairing.}
+\caption{Convection--diffusion on the $\caN\times\caN$ grid: median wall-clock time to relative error $\varepsilon$ for every policy and pairing ($64$ instances).}
 \resizebox{\textwidth}{!}{\cawctolconv}
 \label{tab:ca_tol_convdiff}
 \end{table}

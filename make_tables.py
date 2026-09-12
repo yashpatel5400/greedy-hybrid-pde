@@ -31,6 +31,7 @@ EQ_NAMES = {"Poisson": "Poisson", "ConvDiff": "ConvDiff", "AnisoDiff": "AnisoDif
 
 
 RESULTS_DIR = os.environ.get("RESULTS_DIR", "results")
+MAIN_N = int(os.environ.get("MAIN_N", "128"))  # grid of the main / per-tolerance / significance tables
 OUT_TEX = os.environ.get("OUT_TEX", "paper/costaware_tables.tex")
 
 
@@ -132,7 +133,7 @@ def main():
     for eq in EQS:
         first = True
         for spec in SOLVER_ORDER:
-            keys = [k for k in R if k[0] == eq and k[2] == spec and not k[3]]
+            keys = [k for k in R if k[0] == eq and k[1] == MAIN_N and k[2] == spec and not k[3]]
             if not keys:
                 continue
             d, g = R[keys[0]]
@@ -173,7 +174,7 @@ def main():
     for eq in EQS:
         first = True
         for spec in SOLVER_ORDER:
-            keys = [k for k in R if k[0] == eq and k[2] == spec and not k[3]]
+            keys = [k for k in R if k[0] == eq and k[1] == MAIN_N and k[2] == spec and not k[3]]
             if not keys:
                 continue
             d, g = R[keys[0]]
@@ -211,7 +212,7 @@ def main():
         out.append("Solver & Method & $\\varepsilon{=}10^{-2}$ & $\\varepsilon{=}10^{-3}$ & $\\varepsilon{=}h^2$ & "
                    "$\\varepsilon{=}10^{-5}$ & $\\varepsilon{=}10^{-6}$ & $\\varepsilon{=}10^{-8}$ \\\\ \\midrule")
         for spec in SOLVER_ORDER:
-            keys = [k for k in R if k[0] == eq and k[2] == spec and not k[3]]
+            keys = [k for k in R if k[0] == eq and k[1] == MAIN_N and k[2] == spec and not k[3]]
             if not keys:
                 continue
             d, g = R[keys[0]]
@@ -240,8 +241,8 @@ def main():
                + "".join(f"\\cmidrule(lr){{{2+3*i}-{4+3*i}}}" for i in range(len(eqs_present))))
     out.append("Method & " + " & ".join("$\\|e^{(T)}_h\\|/\\|u_h\\|$ & AUC & $p$" for _ in eqs_present) + " \\\\ \\midrule")
     for spec in SOLVER_ORDER:
-        have = [(eq, R[[k for k in R if k[0] == eq and k[2] == spec and not k[3]][0]])
-                for eq in EQS if [k for k in R if k[0] == eq and k[2] == spec and not k[3]]]
+        have = [(eq, R[[k for k in R if k[0] == eq and k[1] == MAIN_N and k[2] == spec and not k[3]][0]])
+                for eq in EQS if [k for k in R if k[0] == eq and k[1] == MAIN_N and k[2] == spec and not k[3]]]
         if not have:
             continue
         T = have[0][1][0]["args"]["T"]
@@ -294,7 +295,7 @@ def main():
     for eq in EQS:
         first = True
         for spec in SOLVER_ORDER:
-            keys = [k for k in R if k[0] == eq and k[2] == spec and not k[3]]
+            keys = [k for k in R if k[0] == eq and k[1] == MAIN_N and k[2] == spec and not k[3]]
             if not keys:
                 continue
             d, g = R[keys[0]]
@@ -318,7 +319,7 @@ def main():
     for eq in EQS:
         first = True
         for spec in SOLVER_ORDER:
-            keys = [k for k in R if k[0] == eq and k[2] == spec and not k[3]]
+            keys = [k for k in R if k[0] == eq and k[1] == MAIN_N and k[2] == spec and not k[3]]
             if not keys:
                 continue
             d, g = R[keys[0]]
@@ -351,22 +352,22 @@ def main():
                 # best member solver alone, from the pairwise runs (same instances)
                 cls = {}
                 for s_ in members:
-                    kk = [q for q in R if q[0] == eq and q[2] == s_ and not q[3]]
+                    kk = [q for q in R if q[0] == eq and q[1] == MAIN_N and q[2] == s_ and not q[3]]
                     if kk:
                         cls[s_] = np.median(times(R[kk[0]][1]["policies"]["classical"],
                                                   tkey(R[kk[0]][0], d["h2"])))
                 bc = min(cls, key=cls.get)
                 bc_name = SOLVER_NAMES[bc]
-                base = R[[q for q in R if q[0] == eq and q[2] == bc and not q[3]][0]][1]["policies"]["classical"]
+                base = R[[q for q in R if q[0] == eq and q[1] == MAIN_N and q[2] == bc and not q[3]][0]][1]["policies"]["classical"]
                 # best pairwise router (from pairwise runs)
                 pw = {}
                 for s in members:
                     kk = [q for q in R if q[0] == eq and q[2] == s and not q[3]]
                     if kk:
                         pw[s] = R[kk[0]][1]["policies"]["router"]
-                bp = min(pw, key=lambda s: np.median(times(pw[s], tkey(R[[q for q in R if q[0]==eq and q[2]==s and not q[3]][0]][0], d["h2"]))))
+                bp = min(pw, key=lambda s: np.median(times(pw[s], tkey(R[[q for q in R if q[0]==eq and q[1]==MAIN_N and q[2]==s and not q[3]][0]][0], d["h2"]))))
                 pw_rows = pw[bp]
-                pw_key = tkey(R[[q for q in R if q[0] == eq and q[2] == bp and not q[3]][0]][0], d["h2"])
+                pw_key = tkey(R[[q for q in R if q[0] == eq and q[1] == MAIN_N and q[2] == bp and not q[3]][0]][0], d["h2"])
                 t_pw = times(pw_rows, pw_key)
                 t_ens = times(P["router"], key)
                 sp_pw, _ = paired_speedup(t_pw, t_ens)
@@ -423,7 +424,7 @@ def main():
             "OracleRatio": []}
     for eq in EQS:
         for spec in SOLVER_ORDER:
-            keys = [k for k in R if k[0] == eq and k[2] == spec and not k[3]]
+            keys = [k for k in R if k[0] == eq and k[1] == MAIN_N and k[2] == spec and not k[3]]
             if not keys:
                 continue
             d, g = R[keys[0]]
@@ -645,7 +646,7 @@ def main():
     for eq in EQS:
         first = True
         for spec in SOLVER_ORDER:
-            keys = [k for k in R if k[0] == eq and k[2] == spec and not k[3]]
+            keys = [k for k in R if k[0] == eq and k[1] == MAIN_N and k[2] == spec and not k[3]]
             if not keys:
                 continue
             d, g = R[keys[0]]
@@ -697,11 +698,11 @@ def main():
             t_o = times(g["policies"]["oracle"], key)
             cls = {}
             for s_ in members:
-                kk = [q for q in R if q[0] == eq and q[2] == s_ and not q[3]]
+                kk = [q for q in R if q[0] == eq and q[1] == MAIN_N and q[2] == s_ and not q[3]]
                 if kk:
                     cls[s_] = times(R[kk[0]][1]["policies"]["classical"], tkey(R[kk[0]][0], d["h2"]))
             bc = min(cls, key=lambda s_: np.median(cls[s_]))
-            pw = {s_: times(R[[q for q in R if q[0] == eq and q[2] == s_ and not q[3]][0]][1]["policies"]["router"], key) for s_ in members if [q for q in R if q[0] == eq and q[2] == s_ and not q[3]]}
+            pw = {s_: times(R[[q for q in R if q[0] == eq and q[1] == MAIN_N and q[2] == s_ and not q[3]][0]][1]["policies"]["router"], key) for s_ in members if [q for q in R if q[0] == eq and q[1] == MAIN_N and q[2] == s_ and not q[3]]}
             bp = min(pw, key=lambda s_: np.median(pw[s_]))
             wname = "\\{" + ", ".join(SOLVER_NAMES[s_] for s_ in members) + "\\}"
             out.append(" & ".join([eq if first else "", f"${wname}$", pstr(wilcoxon_p(cls[bc], t_e)),
