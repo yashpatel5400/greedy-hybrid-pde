@@ -286,3 +286,105 @@ def demean(u):
 def l2(u):
     """Batched L2 norm over the grid axes."""
     return np.sqrt(np.sum(u ** 2, axis=(-2, -1)))
+
+
+# ---------------------------------------------------------------------------
+# Geometric multigrid (periodic, even N), usable as a stationary solver step
+# ---------------------------------------------------------------------------
+
+def restrict_fw(r):
+    """Full-weighting restriction (..., N, N) -> (..., N/2, N/2), periodic."""
+    N = r.shape[-1]
+    up = np.roll(r, -1, axis=-2); dn = np.roll(r, 1, axis=-2)
+    lf = np.roll(r, 1, axis=-1); rt = np.roll(r, -1, axis=-1)
+    s = (4.0 * r + 2.0 * (up + dn + lf + rt)
+         + np.roll(up, 1, axis=-1) + np.roll(up, -1, axis=-1)
+         + np.roll(dn, 1, axis=-1) + np.roll(dn, -1, axis=-1)) / 16.0
+    return s[..., ::2, ::2]
+
+
+def prolong_bilinear(c):
+    """Bilinear prolongation (..., n, n) -> (..., 2n, 2n), periodic."""
+    n = c.shape[-1]
+    out = np.empty(c.shape[:-2] + (2 * n, 2 * n))
+    cr = np.roll(c, -1, axis=-2)          # c[i+1, j]
+    cc = np.roll(c, -1, axis=-1)          # c[i, j+1]
+    crc = np.roll(cr, -1, axis=-1)        # c[i+1, j+1]
+    out[..., 0::2, 0::2] = c
+    out[..., 1::2, 0::2] = 0.5 * (c + cr)
+    out[..., 0::2, 1::2] = 0.5 * (c + cc)
+    out[..., 1::2, 1::2] = 0.25 * (c + cr + cc + crc)
+    return out
+
+
+class FastMultigrid:
+    """V(nu1, nu2)-cycle with lexicographic Gauss-Seidel smoothing, full
+    weighting / bilinear transfers, rediscretised coarse operators and an FFT
+    direct solve on the coarsest grid (n_coarsest x n_coarsest). One `step`
+    applies one V-cycle to the residual equation, i.e. it is the stationary
+    iteration u <- u + M_MG^{-1} (f - A u)."""
+
+    def __init__(self, pde: FastStencilPDE, nu1=2, nu2=2, n_coarsest=32, smoother="gs"):
+        self.pde = pde
+        self.nu1, self.nu2 = nu1, nu2
+        self.levels = []
+        N = pde.N
+        while N > n_coarsest:
+            assert N % 2 == 0
+            lp = FastStencilPDE(N, equation=pde.equation, a=pde.a, b_vec=(pde.b1, pde.b2))
+            sm = FastGaussSeidel(lp) if smoother == "gs" else FastJacobi(lp, 0.8)
+            self.levels.append((lp, sm))
+            N //= 2
+        self.coarse = FastStencilPDE(N, equation=pde.equation, a=pde.a, b_vec=(pde.b1, pde.b2))
+        self.name = "mg"
+        self.n_levels = len(self.levels) + 1
+
+    def _vcycle(self, lvl, r):
+        """Approximate solution e of A_lvl e = r (r mean-free), starting from 0."""
+        if lvl == len(self.levels):
+            return self.coarse.solve_direct(r)
+        lp, sm = self.levels[lvl]
+        e = np.zeros_like(r)
+        for _ in range(self.nu1):
+            e = sm.step(e, r)
+        rc = restrict_fw(lp.residual(e, r))
+        e = e + prolong_bilinear(self._vcycle(lvl + 1, rc))
+        for _ in range(self.nu2):
+            e = sm.step(e, r)
+        return e
+
+    def step(self, u, f, r=None):
+        if r is None:
+            r = self.pde.residual(u, f)
+        return u + self._vcycle(0, r)
+
+
+class FFTDirect:
+    """Direct solve by FFT diagonalisation (the reference solver for the
+    constant-coefficient periodic problem); one `step` solves exactly."""
+
+    def __init__(self, pde: FastStencilPDE):
+        self.pde = pde
+        self.name = "fft"
+
+    def step(self, u, f, r=None):
+        if r is None:
+            r = self.pde.residual(u, f)
+        return u + self.pde.solve_direct(r)
+
+
+_MAKE_SOLVER_BASIC = make_solver
+
+
+def make_solver(pde, spec):
+    if spec == "mg":
+        return FastMultigrid(pde)
+    if spec.startswith("mg_"):           # e.g. mg_1_1 (nu1, nu2)
+        _, a, b = spec.split("_")
+        return FastMultigrid(pde, nu1=int(a), nu2=int(b))
+    if spec == "fft":
+        return FFTDirect(pde)
+    return _MAKE_SOLVER_BASIC(pde, spec)
+
+
+SOLVER_NAMES.update({"mg": "Multigrid V(2,2)", "fft": "FFT direct"})

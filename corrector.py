@@ -271,13 +271,20 @@ def _random_band_fields(pde, transfer, rng, n, mode):
     return rc, ec
 
 
-def make_training_pairs(pde, transfer, rng, n, mix=("grf", "rough", "white", "tilted")):
+def make_training_pairs(pde, transfer, rng, n, mix=("grf", "rough", "white", "tilted"), chunk=1024):
+    """Pairs are generated in chunks so that only coarse (n_c x n_c) fields are
+    kept in memory (fine-grid fields are transient), which keeps large grids
+    tractable."""
     parts_r, parts_e = [], []
     per = int(math.ceil(n / len(mix)))
     for m in mix:
-        rc, ec = _random_band_fields(pde, transfer, rng, per, m)
-        parts_r.append(rc)
-        parts_e.append(ec)
+        done = 0
+        while done < per:
+            k = min(chunk, per - done)
+            rc, ec = _random_band_fields(pde, transfer, rng, k, m)
+            parts_r.append(rc)
+            parts_e.append(ec)
+            done += k
     rc = np.concatenate(parts_r)[:n]
     ec = np.concatenate(parts_e)[:n]
     rn = np.sqrt((rc ** 2).sum(axis=(-2, -1), keepdims=True))

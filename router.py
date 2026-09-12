@@ -226,16 +226,18 @@ def train_router(X, C, K, epochs=150, lr=2e-3, hidden=64, seed=0, verbose=True):
 
 
 def fit_router(env: Env, n_inst=128, seed=555, dagger_rounds=2, eps=0.1, epochs=150,
-               hidden=64, verbose=True, rate=False, max_epochs=3000):
+               hidden=64, verbose=True, rate=False, max_epochs=3000, err_stop=1e-9):
     rng = np.random.default_rng(seed)
     t0 = time.time()
-    X, C, A = collect_states(env, n_inst, rng, behavior=None, eps=eps, rate=rate, max_epochs=max_epochs)
+    X, C, A = collect_states(env, n_inst, rng, behavior=None, eps=eps, rate=rate, max_epochs=max_epochs,
+                             err_stop=err_stop)
     frac_no = (C.argmin(1) == env.no_index).mean() if env.no_index is not None else 0.0
     print(f"  round 0: {len(X)} states ({frac_no*100:.1f}% corrector-preferred) in {time.time()-t0:.0f}s",
           flush=True)
     router = train_router(X, C, env.K, epochs=epochs, hidden=hidden, seed=seed, verbose=verbose)
     for rd in range(dagger_rounds):
-        X2, C2, A2 = collect_states(env, n_inst, rng, behavior=router, rate=rate, max_epochs=max_epochs)
+        X2, C2, A2 = collect_states(env, n_inst, rng, behavior=router, rate=rate, max_epochs=max_epochs,
+                                    err_stop=err_stop)
         X, C = np.concatenate([X, X2]), np.concatenate([C, C2])
         agree = (A2 == C2.argmin(1)).mean()
         print(f"  DAgger round {rd+1}: +{len(X2)} on-policy states (agreement with oracle {agree*100:.1f}%)",
