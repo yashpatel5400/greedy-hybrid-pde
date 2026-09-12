@@ -16,6 +16,7 @@
 \newcommand{\rev}[1]{{\color{red}#1}}
 % Cost-aware wall-clock revision (Sept 2026): new material is wrapped in \edit{...}
 \newcommand{\edit}[1]{{\color{red}#1}}
+\newcommand{\newfig}[2][\linewidth]{{\setlength{\fboxrule}{1.2pt}\setlength{\fboxsep}{2pt}\fcolorbox{red}{white}{\includegraphics[width=#1]{#2}}}}
 \input{costaware_tables}
 % the "default" option is equal to the "main" option, which is used for the Main Track with double-blind reviewing.
 % 1. "main" option is used for the Main Track
@@ -185,6 +186,8 @@ Ann Arbor, MI 48104, USA \\
 
 
 \maketitle
+
+\edit{\noindent\textbf{Revision note.} All text, tables and figures added in this revision are typeset in red (new figures carry a red frame); everything in black is unchanged from the submitted version.}
 
 
 \begin{abstract}
@@ -664,8 +667,9 @@ ensembles $\mathcal{W}$ of increasing size, consisting of a trained DeepONet and
 \end{table}
 
 \begin{figure}[t]
+    \color{red}
     \centering
-    \includegraphics[width=\linewidth]{neurips_images/ca_router_usage.png}
+    \newfig[0.98\linewidth]{neurips_images/ca_router_usage.png}
     \caption{\edit{Corrector usage on the $\caN\times\caN$ grid: fraction of test runs that execute a corrector call at each iteration, for the learned router, the cost-aware oracle and HINTS ($\tau{=}25$), for every solver pairing (columns) and both equations (rows).}}
     \label{fig:ca_usage_main}
 \end{figure}
