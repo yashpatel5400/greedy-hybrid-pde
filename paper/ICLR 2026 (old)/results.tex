@@ -1,0 +1,207 @@
+\documentclass{article}
+\usepackage{graphicx} % Required for inserting images
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\title{Results}
+\author{srayan }
+\date{March 2026}
+
+\begin{document}
+
+\maketitle
+
+
+
+\section*{Single Solver}
+
+
+\begin{table}[]
+    \centering
+    \resizebox{\textwidth}{!}{
+    \begin{tabular}{|l|lrlrlrlr|}
+    \toprule
+    Methods & FinalError Poisson & P value Poisson & AUC Poisson & P value AUC Poisson & FinalError ConvDiff & P value ConvDiff & AUC ConvDiff & P value AUC ConvDiff \\
+    \midrule 
+    \multicolumn{9}{|c|}{Jacobi-related} \\
+    \midrule
+    Jacobi only & 0.496 (1.213) & 0.001152 & 1.064 (2.553) & 0.001070 & 0.176 (0.429) & 0.000971 & 0.407 (0.946) & 0.000902 \\
+    HINTS-Jacobi & 0.761 (0.019) & 0.000000 & 0.463 (0.716) & 0.000000 & 0.454 (0.025) & 0.000000 & 0.235 (0.320) & 0.000011 \\
+    Learned Greedy-Jacobi & 0.077 (0.216) & NaN & 0.223 (0.554) & NaN & 0.049 (0.149) & NaN & 0.129 (0.339) & NaN \\
+    True-Greedy-Jacobi & 0.022 (0.018) & NaN & 0.113 (0.207) & NaN & 0.013 (0.014) & NaN & 0.060 (0.113) & NaN \\
+    \midrule 
+    \multicolumn{9}{|c|}{GS-related} \\
+    \midrule
+    GS only & 0.025 (0.060) & 0.001465 & 0.563 (1.350) & 0.001246 & 0.000 (0.000) & 0.038415 & 0.115 (0.266) & 0.000971 \\
+    HINTS-GS & 0.724 (0.000) & 0.000000 & 0.382 (0.582) & 0.000000 & 0.456 (0.000) & 0.000000 & 0.150 (0.189) & 0.000000 \\
+    Learned Greedy-GS & 0.003 (0.010) & NaN & 0.115 (0.285) & NaN & 0.000 (0.000) & NaN & 0.035 (0.095) & NaN \\
+    True-Greedy-GS & 0.001 (0.001) & NaN & 0.067 (0.123) & NaN & 0.000 (0.000) & NaN & 0.022 (0.044) & NaN \\
+    \midrule 
+    \multicolumn{9}{|c|}{SymGS-related} \\
+    \midrule
+    SymGS only & 0.000 (0.000) & 0.016096 & 0.299 (0.725) & 0.001419 & 0.000 (0.000) & \textbf{0.789076} & 0.088 (0.204) & 0.001359 \\
+    HINTS-SymGS & 0.709 (0.000) & 0.000000 & 0.296 (0.458) & 0.000000 & 0.460 (0.000) & 0.000000 & 0.128 (0.157) & 0.000000 \\
+    Learned Greedy-SymGS & 0.000 (0.000) & NaN & 0.074 (0.194) & NaN & 0.000 (0.000) & NaN & 0.026 (0.050) & NaN \\
+    True-Greedy-SymGS & 0.000 (0.000) & NaN & 0.041 (0.077) & NaN & 0.000 (0.000) & NaN & 0.019 (0.038) & NaN \\
+    \bottomrule
+    \end{tabular}}
+
+    \caption{Single Solver result (Sym GS is Symmetric Gauss seidel)}
+    \label{tab:placeholder}
+\end{table}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.75\linewidth]{images2/deeponet_usage.png}
+    \caption{DeepONet Usage}
+    \label{fig:onetusage}
+\end{figure}
+
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.75\linewidth]{images2/solverusage_convdiff.png}
+    \caption{Solver Usage ConvDiff}
+    \label{fig:solverusage_conv}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.75\linewidth]{images2/solverusage_poisson.png}
+    \caption{Solver Usage Poisson}
+    \label{fig:solverusage_pois}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.75\linewidth]{images2/sample_error_convergence.png}
+    \caption{Sample Error Convergence}
+    \label{fig:error_convergence}
+\end{figure}
+
+
+
+\section{Multiple Solvers}
+
+\begin{table}[]
+    \centering
+    \resizebox{\textwidth}{!}{
+    \begin{tabular}{lllll}
+    \toprule
+    Methods & Final Error Poisson & AUC Poisson & Final Error ConvDiff & AUC ConvDiff \\
+    \midrule
+    Learned Greedy-SOR w/ 3 solvers & 0.000 (0.000) & 0.089 (0.214) & 0.000 (0.000) & 0.025 (0.057) \\
+    True-Greedy-SOR w/ 3 solvers & 0.000 (0.000) & 0.048 (0.093) & 0.000 (0.000) & 0.013 (0.030) \\
+    Learned Greedy-SOR w/ 4 solvers & 0.000 (0.000) & 0.061 (0.142) & 0.000 (0.000) & 0.011 (0.025) \\
+    True-Greedy-SOR w/ 4 solvers & 0.000 (0.000) & 0.037 (0.076) & 0.000 (0.000) & 0.009 (0.022) \\
+    Learned Greedy-SOR w/ 5 solvers & 0.000 (0.000) & 0.049 (0.115) & 0.000 (0.000) & 0.013 (0.031) \\
+    True-Greedy-SOR w/ 5 solvers & 0.000 (0.000) & 0.035 (0.079) & 0.000 (0.000) & 0.009 (0.022) \\
+    Learned Greedy-SOR w/ 6 solvers & 0.000 (0.000) & 0.053 (0.123) & inf (nan) & inf (nan) \\
+    True-Greedy-SOR w/ 6 solvers & 0.000 (0.000) & 0.035 (0.079) & 0.000 (0.000) & 0.009 (0.022) \\
+    \bottomrule
+    \end{tabular}}
+    \caption{Caption}
+    \label{tab:placeholder}
+\end{table}
+
+
+
+
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.75\linewidth]{images2/multiple_solverusage_poisson.png}
+    \caption{Multiple Solver Usage Poisson}
+    \label{fig:multiplesolver}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.75\linewidth]{images2/multiple_solverusage_convdiff.png}
+    \caption{Multiple solver usage Convdiff}
+    \label{fig:placeholder}
+\end{figure}
+
+\section{Notes}
+
+Single Solver suggestion
+\begin{itemize}
+    \item why are the row labels bold?
+    \item Title for solver usage needs the equation in it
+    \item poisson jacobi and conv diff jacobi error convergence plots look suspiciously similar. lol they aren't
+    \item I need to retrain greedy SOR with 6 solvers for ConvDiff
+    \item the multiple solver usage plots need better titles
+    \item Table 1
+    \begin{itemize}
+        \item defer p values and true greedy stuff to the appendix 
+        \item bold the best one
+        \item include explanation of the bolded p value in the appendix
+        \item include two more solvers - appenidx work, SOR and weighted jacobi
+    \end{itemize}
+    \item Figure 1
+    \begin{itemize}
+        \item include the true greedy and learned greedy comparison in the appendix
+        \item we want the learned greedy deeponet usage in the main body
+        \item we want to to point out two things:
+        \begin{itemize}
+            \item it is using the deeponet
+            \item using it diffently across samples
+        \end{itemize}
+        \item cut off the iteration sooner so maybe at 100 or 150
+        \item move the true greedy comparisons to the appendix
+    \end{itemize}
+    \item Figure 2
+    \begin{itemize}
+        \item move this to the appendix
+    \end{itemize}
+    \item New Figure: final prediction from HINTS, solver only, learned greedy and ground truth for each solver (jacbi, gs, symgs) - 12 heatmaps
+    \item Table 2
+    \begin{itemize}
+        \item include the final error and Auc for sor only, sor 1.25, etc lol
+        \item we want two convey things:
+        \begin{itemize}
+            \item monotonc decreasing trend as we increase the numvr solvers
+            \item and it's just better than having each of them run indivdually for 300 iteration
+        \end{itemize}
+        \item move the true greedy comparisons to the appendix
+    \end{itemize}
+    \item Figure 5:
+    \begin{itemize}
+        \item router is using the entire suite of solvers
+        \item moving to the appendix
+        \item highlight that this is beneficial to learn a sample-dependent router
+    \end{itemize}
+    \item mode wise errors also we need
+    
+\end{itemize}
+
+
+In this section, we empirically demonstrate the fast and uniform convergence of the approximate greedy router on Poisson and convection–diffusion (ConvDiff) equations posed on the unit domain $D = [0,1]^2$.
+
+For Poisson, we consider the constant-coefficient model
+\begin{equation*}
+    - \Delta u(\mathbf{x}) = f(\mathbf{x}), \quad \mathbf{x}\in D,
+\end{equation*}
+and for ConvDiff, we adopt the sign convention
+\begin{equation*}
+    -\Delta u(\mathbf{x}) + 20\,\partial_{x_1}u(\mathbf{x}) + 20\,\partial_{x_2}u(\mathbf{x}) = f(\mathbf{x}), \quad \mathbf{x}\in D.
+\end{equation*}
+We impose periodic boundary conditions for both equations, and center $f$ to satisfy the compatibility condition $\int_D f(\mathbf{x})\,d\mathbf{x} = 0$. The domain is discretized on a $31\times31$ uniform grid.
+
+Data is sampled from a zero-mean hierarchical Gaussian random field on the periodic domain with covariance operator $\alpha(-\Delta + \beta I)^{-\gamma}$, where $\alpha,\beta,\gamma$ vary across samples (see \Cref{sec:training details}).
+
+We report performance over $64$ test samples using the mean final error $\|e_h^{(T)}\|_2$ and the mean area under the curve (AUC), defined as $\sum_{t=1}^T \|e_h^{(t)}\|_2$. While the final error measures terminal accuracy, AUC captures convergence over the full trajectory and penalizes non-monotone behavior.
+
+\paragraph{Comparing Greedy with HINTS.}
+We consider Jacobi, Gauss–Seidel (GS), and symmetric Gauss–Seidel (SymGS) solvers, together with a DeepONet model. Baselines include single-solver schedules and HINTS variants (HINTS-Jacobi, HINTS-GS, HINTS-SymGS), where the DeepONet correction is applied every 24 iterations. 
+
+We train LSTM-based routers using the surrogate loss in \Cref{eq:routersurrogate} for three solver-access sets: Jacobi+DeepONet (Greedy-Jacobi), GS+DeepONet (Greedy-GS), and SymGS+DeepONet (Greedy-SymGS). We use an LSTM to capture the sequential nature of routing decisions, where the benefit of each action depends on the evolving error trajectory.
+
+Comparisons are restricted to methods with identical solver access. Accordingly, results are grouped by solver family (Jacobi, GS, and SymGS). Each method is run for 300 iterations.
+
+
+As shown in \Cref{tab:errorcomparison}, the greedy router achieves the lowest final error and mean AUC across all solver families: Greedy-Jacobi, Greedy-GS, and Greedy-SymGS consistently outperform both single-solver and HINTS baselines. While HINTS improves over fixed schedules, it exhibits sawtooth error trajectories (\Cref{fig:errorcomparison}) due to periodic application of the DeepONet even when suboptimal. In contrast, the greedy routers select solvers that yield immediate error reduction, resulting in lower AUC and near-monotone convergence.
+
+The learned routing policy is highly non-uniform across samples (\Cref{fig:deeponet}): the DeepONet correction is often unused after approximately 40 iterations for many instances. This highlights the need for sample-dependent routing. HINTS, by design, continues to invoke the neural operator at fixed intervals regardless of its effectiveness, leading to higher error and degraded AUC.
+
+\end{document}

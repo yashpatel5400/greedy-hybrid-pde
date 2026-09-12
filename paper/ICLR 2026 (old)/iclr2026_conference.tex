@@ -1,0 +1,1276 @@
+
+\documentclass{article} % For LaTeX2e
+\usepackage{iclr2026_conference,times}
+
+% Optional math commands from https://github.com/goodfeli/dlbook_notation.
+\input{math_commands.tex}
+
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+
+%%%%%%%%%%%%%%%SAHANA ADDED THIS %%%%%%%%%%%
+\usepackage{amsthm}
+\usepackage{cleveref}
+\usepackage{graphicx}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{claim}[theorem]{Claim}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{fact}[theorem]{Fact}
+\newtheorem{example}[theorem]{Example}
+\newtheorem{notation}[theorem]{Notation}
+\newtheorem{observation}[theorem]{Observation}
+\newtheorem{conjecture}[theorem]{Conjecture}
+
+\newtheorem{innercustomgeneric}{\customgenericname}
+\providecommand{\customgenericname}{}
+\newcommand{\newcustomtheorem}[2]{%
+  \newenvironment{#1}[1]
+  {%
+   \renewcommand\customgenericname{#2}%
+   \renewcommand\theinnercustomgeneric{##1}%
+   \innercustomgeneric
+  }
+  {\endinnercustomgeneric}
+}
+
+\newcustomtheorem{customtheorem}{Theorem}
+\newcustomtheorem{customlemma}{Lemma}
+\newcustomtheorem{customclaim}{Claim}
+\newcustomtheorem{customproposition}{Proposition}
+\newcustomtheorem{customcorollary}{Corollary}
+\newcustomtheorem{customfact}{Fact}
+\newcustomtheorem{customexample}{Example}
+\newcustomtheorem{customnotation}{Notation}
+\newcustomtheorem{customobservation}{Observation}
+\newcustomtheorem{customconjecture}{Conjecture}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+% \title{Greedy Hybrid PDE Solver with \\ Neural Operators and Traditional solvers}
+\title{A Greedy PDE Router for Blending Neural Operators and Classical Methods}
+
+% Authors must not appear in the submitted version. They should be hidden
+% as long as the \iclrfinalcopy macro remains commented out below.
+% Non-anonymous submissions will be rejected without review.
+
+\author{Sahana Rayan \\
+Department of Statistics\\
+University of Michigan\\
+Ann Arbor, MI 48104, USA \\
+\texttt{\{srayan\}@umich.edu} \\
+\And
+Yash Patel \\
+Department of Statistics\\
+University of Michigan\\
+Ann Arbor, MI 48104, USA \\
+\texttt{\{yppatel\}@umich.edu} \\
+\And
+Ambuj Tewari \\
+Department of Statistics\\
+University of Michigan\\
+Ann Arbor, MI 48104, USA \\
+\texttt{\{tewaria\}@umich.edu} \\
+}
+% \author{Antiquus S.~Hippocampus, Natalia Cerebro \& Amelie P. Amygdale \thanks{ Use footnote for providing further information
+% about author (webpage, alternative address)---\emph{not} for acknowledging
+% funding agencies.  Funding acknowledgements go at the end of the paper.} \\
+% Department of Computer Science\\
+% Cranberry-Lemon University\\
+% Pittsburgh, PA 15213, USA \\
+% \texttt{\{hippo,brain,jen\}@cs.cranberry-lemon.edu} \\
+% \And
+% Ji Q. Ren \& Yevgeny LeNet \\
+% Department of Computational Neuroscience \\
+% University of the Witwatersrand \\
+% Joburg, South Africa \\
+% \texttt{\{robot,net\}@wits.ac.za} \\
+% \AND
+% Coauthor \\
+% Affiliation \\
+% Address \\
+% \texttt{email}
+% }
+
+% The \author macro works with any number of authors. There are two commands
+% used to separate the names and addresses of multiple authors: \And and \AND.
+%
+% Using \And between authors leaves it to \LaTeX{} to determine where to break
+% the lines. Using \AND forces a linebreak at that point. So, if \LaTeX{}
+% puts 3 of 4 authors names on the first line, and the last on the second
+% line, try using \AND instead of \And before the third author name.
+
+\newcommand{\fix}{\marginpar{FIX}}
+\newcommand{\new}{\marginpar{NEW}}
+
+\newcommand\ambuj[1]{\textcolor{red}{AT: #1}}
+% \iclrfinalcopy % Uncomment for camera-ready version, but NOT for submission.
+\begin{document}
+
+
+\maketitle
+
+\begin{abstract}
+
+
+When solving PDEs, classical numerical solvers are often computationally expensive, while machine learning methods can suffer from spectral bias, failing to capture high-frequency components. Designing an optimal hybrid iterative solver--where, at each iteration, a solver is selected from an ensemble of solvers to leverage their complementary strengths--poses a challenging combinatorial problem. While the greedy selection strategy is desirable for its constant-factor approximation guarantee to the optimal solution, it requires knowledge of the true error at each step, which is generally unavailable in practice. We address this by proposing an approximate greedy router that efficiently mimics a greedy approach to solver selection. Empirical results on the Poisson and Helmholtz equations demonstrate that our method outperforms single-solver baselines and existing hybrid solver approaches, such as HINTS, achieving faster and more stable convergence.
+
+\end{abstract}
+
+\section{Introduction}
+
+
+Natural phenomena and engineered systems are often governed by ordinary and partial differential equations (PDEs). Solving these equations enables a variety of tasks - predicting the evolution of the system through simulation (e.g., forecasting weather using the Navier-Stokes equations) \citep{kalnay2003atmospheric,bauer2015quiet,staniforth1991semi}, addressing control problems (e.g., optimizing heat shield design for spacecrafts using heat transfer equations) \citep{anderson1989hypersonic,troltzsch2010optimal}, and tackling inverse problems based on external measurements (e.g., reconstructing brain activity from EEG data using electrophysiological models) \citep{baillet2001electromagnetic,grech2008review}. 
+
+Traditionally, PDEs are solved using finite difference methods \citep{smith1985numerical,leveque2007finite}, which discretize the spatial and/or temporal domain and approximate the solution by solving a system of equations at the discrete grid points. Similarly, finite element methods \citep{hughes2003finite,bathe2006finite,brenner2008mathematical} construct a system of equations based on fitted curves for each finite element, and then rely on numerical linear algebra techniques--such as the Jacobi and Gauss-Seidel method \citep{saad2003iterative}--to compute the solution. 
+% Such iterative methods, however, suffer from high computational costs, especially when finely resolved grids are required--regardless of the sparsity of the coefficient matrix. 
+Such iterative methods, however, lack generalization across different initial conditions, boundary conditions, or forcing functions, as even minor changes to any of these parameters require re-solving the entire system of equations from scratch. 
+
+These challenges have motivated the development of neural operators \citep{kovachki2023neural}--a class of machine learning models that aim to learn the solution operator directly, enabling fast inference across a range of parameters. Neural operators lift the classical linear layer in neural networks to a linear operator--typically a kernel integral operator--between infinite-dimensional function spaces. While the universal approximation theorem of operators \citep{chen1995universal} suggests that neural operators can approximate solution operators with high accuracy, they are prone to spectral bias \citep{liu2021multiscale,liu2024mitigating,you2024mscalefno,khodakarami2025mitigating,xu2025understanding}--similar to traditional neural networks \citep{rahaman2019spectral,xu2019frequency,luo2019theory}--and favor learning the low-frequency components of the solution function, often struggling to capture high-frequency features that iterative solvers excel at. 
+
+Recognizing this complementarity, \citet{zhang2024blending} proposed HINTS, a hybrid solver that 
+% leverages the advantages of classical iterative methods and neural operators by
+interleaves a neural operator pass every $\tau^{\text{th}}$ iteration (with $\tau$ fixed a priori) of a classical solver.
+% applying a classical update at each step $t$ and every $\tau^{\text{th}}$ step (with $\tau$ fixed a priori), it replaces that update with a neural correction. 
+While HINTS reports significant empirical gains in convergence and accuracy over the standalone neural operator and Jacobi solver, this fixed schedule can be detrimental: a poorly timed neural correction may increase the error and undo recent progress. 
+% \ambuj{clarify ``periodically incorporating predictions" and ``fixed cadence" so that it is easy for the reader to see what the main limitation of HINTS is}
+
+Although dynamic solver schedules are desirable, identifying the optimal sequence of solvers that minimizes final error is combinatorial since the search space grows exponentially with the number of iterations. A practical alternative is the greedy rule that, at each iteration, selects the solver with the largest immediate error reduction.
+% that most reduces the prediction error at the current step. 
+Such a rule can be near-optimal when the final error satisfies (weak) supermodularity--so that applying a beneficial solver earlier is at least as valuable as applying it later. To support this approach, we make the following contributions:
+\begin{itemize}
+    \item We present a general hybrid PDE solver in which a routing rule chooses, at each iteration, from a set of classical solvers and neural operators (not just two).  
+    With oracle access to the true error at every step, we show that a greedy routing rule
+    achieves a constant-factor approximation to the optimal strategy for linear PDEs, provided the updates are error-reducing (Lipschitz with constant $<1$) and zero-preserving--conditions under which weak supermodularity holds.
+    \item  Given that the true error is not observed at test time, a convex surrogate loss is introduced, which, when minimized, enables the learned model to imitate the greedy solver without access to true error information. This alignment is guaranteed through Bayes consistency.
+    \item We empirically demonstrate that our approximate greedy solver outperforms HINTS and individual solvers in terms of faster, more stable convergence on benchmark PDEs, such as the Poisson and Helmholtz equations.
+\end{itemize}
+
+
+\section{Problem Setting and Background} \label{sec:background}
+
+Consider the following linear PDE:
+\begin{equation} \label{eq:mainpde}
+    \begin{split}
+    \mathcal{L}_{x}^a\left(u\right) = f ,x \in D; \quad
+    \mathcal{B}_{x}\left(u\right) = b ,x \in \partial D
+    \end{split}
+\end{equation}
+where $\mathcal{L}_x^a$ is a differential operator with respect to the spatial variable $x \in D$ parameterized by the coefficient function $a$,  $f$ is a forcing function,  $u$ is the solution to the PDE, $\mathcal{B}_{x}$ is the boundary operator, and $b$ is the boundary term. Such PDEs can be solved numerically using various discretization strategies, such as finite differences \citep{smith1985numerical,leveque2007finite}, finite element, and spectral methods \citep{boyd2001chebyshev,canuto2006spectral}. Here, we focus on finite differences, which replace derivatives with difference quotients (e.x., $\partial_x u(x) \approx (u(x + h) - u(x))/h$) on a uniform grid.
+
+Formally, let $h$ be the grid size and $G_h(D)$ be a uniform grid with spacing $h$ over $D$. Given a function $g: D \to \mathbb{R}$, we represent its restriction to $G_h(D)$ by $g_h \in \mathbb{R}^N$,
+% , i.e. vector of $g$ evaluated at the points of $G_h(D)$.
+where $N = |G_h(D)|$. If $\mathcal{L}_h^a \in \mathbb{R}^{N \times N}$ is the discretized operator, the discrete counterpart of \Cref{eq:mainpde} is expressed as
+\begin{equation} \label{eq:mainpdediscrete}
+    \mathcal{L}_h^au_h = f_h,
+\end{equation}
+with the boundary conditions incorporated in $\mathcal{L}_h^a$. Thus, the PDE reduces to a linear system of equations. Unlike much of the neural operator literature, which retains function space formulations for discretization invariance, we follow the conventions of classical numerical analysis and represent all functions and operators as finite-dimensional vectors and matrices. Discretization invariance is not essential here, since we focus on fixed-grid problems.
+% and solver collaborations. 
+
+\subsection{Iterative PDE Solvers} \label{sec:finitedifference}
+Direct methods like Gauss Elimination and Thomas Algorithm can be computationally expensive in high-dimensional domains when solving systems like \Cref{eq:mainpdediscrete}.
+% While direct methods like Gauss Elimination and Thomas Algorithm are often employed to approximate the solution to systems of equations like \Cref{eq:mainpdediscrete}, they can be computationally expensive in high-dimensional domains. 
+In contrast, iterative methods like Jacobi and Gauss-Seidel offer computational speedups by iteratively updating the solution, gradually converging to the true solution for the PDE. The general iterative update is
+\begin{equation}\label{eq:iterativeupdate}
+    u^{(t + 1)} = u^{(t)} + C\left(f_h - \mathcal{L}_h^au^{(t)}\right),
+\end{equation}
+where $u^{(t)}$ is the $t^{\text{th}}$ iterate of the solution and $C$ is a preconditioning matrix. Jacobi uses $C = D^{-1}$, where $D$ is the diagonal of $\mathcal{L}_h^a$, and Gauss-Seidel uses $C = (D + L)^{-1}$, where $L$ denotes the strict lower triangular part. 
+However, iterative methods tend to damp low frequency components of the error slowly. Multigrid solvers \citep{briggs2000multigrid,trottenberg2001multigrid,hackbusch2013multi} 
+% are an advanced class of iterative methods that 
+tackle this problem by alternating smoothing
+% with specialized preconditioning matrices. Specifically, multigrid methods 
+% interleave solving problems 
+on coarse and fine grid resolutions to dampen more uniformly across frequencies. We defer the reader to \Cref{sec:multigrid} for more background on Multigrid solvers.
+
+% and the particular form of the preconditioning matrix.
+
+% \sahana{Might move the next two paragraphs to the appendix}
+
+
+
+\subsection{Neural Operators} \label{sec:neuraloperators}
+
+Suppose we observe samples $\{(a_i, f_i, u_i)\}_{i = 1}^N$ such that $(a_i, f_i) \sim \mathcal{P}$ are i.i.d. samples drawn from some distribution. Let $u_i$ be generated by a deterministic solution operator $\mathcal{G}^{*}$, i.e., $u_i = \mathcal{G}^{*}(a_i, f_i)$. 
+A neural operator  $\mathcal{G}_{\theta}$ seeks to approximate $\mathcal{G}^*$ by minimizing the expected squared $L^2(D)$ error (with respect to the Lebesgue measure): $\mathcal{R}_{\text{NO}}(\mathcal{G}_{\theta})  = \mathbb{E}_{(a, f) \sim  \mathcal{P}}\left[l_{\text{NO}}(a, f, u, \mathcal{G}_{\theta})\right]$, where
+% Given a Lebesgue measure on $D$, neural operators  $\mathcal{G}_{\theta}$ seek to approximate $\mathcal{G}^*$ by minimizing the risk  $\mathcal{R}_{\text{NO}}(\mathcal{G}_{\theta})  = \mathbb{E}_{(a, f) \sim  \mathcal{P}}\left[l_{\text{NO}}(a, f, u, \mathcal{G}_{\theta})\right]$ where:
+\begin{equation*} \label{eq:NOloss}
+    l_{\text{NO}}(a_i, f_i, u_i, \mathcal{G}_{\theta}) = \int_{D} \left\|u_i(x) - \mathcal{G}_{\theta}(a_i, f_i)(x)\right\|_2^2dx.
+\end{equation*}
+Neural operators often use discretization-invariant layers. Prominent instantiations include Fourier Neural Operators, which use spectral transforms \citep{li2020fourier}, Graph Neural Operators, which perform graph-based aggregation over sampled points \citep{li2020multipole}, and DeepONets, which employ a trunk–branch decomposition to map input functions to output functions \citep{lu2021learning}. 
+
+
+\subsection{Greedy Optimization} \label{sec:bggreedy}
+
+Consider the problem of maximizing $g(S)$ over $S\subseteq \Omega$ with $|S| \leq T$ where $g: 2^{\Omega} \to \mathbb{R}$ is a set function defined on subsets of a set $\Omega$. An exhaustive search over all subsets quickly becomes infeasible. An efficient alternative is the greedy algorithm. It builds the solution subset iteratively by, at each step, adding the element $\omega^*$ that yields the largest marginal gain, i.e. $\omega^* =  \argmax_{\omega \in \Omega \setminus S} g(S \cup \omega)$, and updating $S \leftarrow S \ \cup \{\omega^*\}$. When $g$ is non-negative, monotone (adding elements never decreases the value), and submodular (diminishing returns), the greedy algorithm achieves a $(1 - e^{-1})$ approximation to the optimal solution \citep{nemhauser1978analysis}. Formally, a function $g$ is submodular if $g(A \ \cup \{\omega\}) - g(A) \geq g(B \ \cup \{\omega\}) - g(B)$ for all $A \subseteq B \subseteq \Omega$ and $\omega \in \Omega \setminus B$; intuitively, delaying an addition cannot increase its benefit. For set function minimization problems, supermodularity, where the inequality flips, plays an analogous role, and the greedy rule achieves constant-factor approximation guarantees \citep{liberty2017greedy}.
+
+The suboptimality of the greedy algorithm has been extensively studied for both set-function minimization \citep{bounia2023approximating}  and maximization \citep{das2018approximate,feige2011maximizing,bian2017guarantees,harshaw2019submodular} when standard assumptions--non-negativity, monotonicity, and sub/supermodularity--are weakened. In contrast, results on greedy sequence maximization \citep{streeter2008online,alaei2021maximizing,zhang2015string,bernardini2020through,van2024performance,tschiatschek2017selecting}--where the ordering of the elements affects the function--have led to sequential analogues of submodularity and monotonicity. We leverage these tools to analyze the suboptimality of the greedy solution to minimizing the final error.
+
+% \sahana{We can include a background section on greedy set optimization or consistency instead??}
+
+\section{General framework for Hybrid Solvers}
+
+% \sahana{Feel like I should include this in \Cref{sec:background} instead}
+
+To solve \Cref{eq:mainpdediscrete}, consider the following hybrid iterative update:
+\begin{equation}
+     u^{\left(t + 1\right)}_h = u^{\left(t\right)}_h + C_{S_t}\left(f_h - \mathcal{L}_h^au^{\left(t \right)}_h\right)
+\end{equation}
+where $\mathcal{C} =\{C_{j}\}_{j = 1}^K$ denotes a set of $K$ preconditioning functions and $S_t \in [K] = \{1, \dots, K\}$ indexes the function chosen at step $t$. Here, we use ``preconditioning function'' broadly to refer to any update rule, encompassing classical approaches, where $C_j(x) = C_jx$ is a preconditioning matrix, and learned models, such as neural operators. 
+% Thus, each $C \in \mathcal{C}$ corresponds to a particular solver or update mechanism.
+This update generalizes the form of classical methods, as seen in \Cref{eq:iterativeupdate}, by allowing $C_j$ to be non-linear and enabling the preconditioning function to be adaptively chosen at every step. $\mathcal{C}$ can also accommodate parameterized solver families (e.g., different Jacobi relaxation weights or multigrid cycle depths), enabling adaptive selection of solver parameters.  As the number of solvers $K$ grows, it raises the likelihood of a substantial immediate error drop. Furthermore, HINTS \citep{zhang2024blending} is a special case of this hybrid solver with $K = 2$, where  $C_1$ is a neural operator and $C_2$ is a classical preconditioner. Its routing rule is given by $S_t = \1_{t \bmod \tau > 0} + 1$, which selects $C_1$ every $\tau$ steps and $C_2$ otherwise.
+
+Let $e^{(t)}_h = u_h - u^{(t)}_h$ denote the error at step $t$. Then, 
+% the update rule can be written in terms of the error from the previous step:
+\begin{align*}
+    e^{(t + 1)}_h = u_h -  u^{(t)}_h -C_{S_t}\left(\mathcal{L}_h^au_h - \mathcal{L}_h^au^{\left(t\right)}_h\right) = \left(I- C_{S_t} \circ \mathcal{L}_h^a\right)(e^{(t)}_h)
+\end{align*}
+where $I$ is the identity map and $I - C_{j} \circ\mathcal{L}_h^a$ is the error propagation function for the $j^{\text{th}}$ solver. Here, ``$\circ$'' denotes function composition (for linear $C_{j}$, this coincides with matrix multiplication).
+% composition notation for generality: when $C_{j}$ is a matrix, this coincides with matrix multiplication; for nonlinear $C_j$, it simply means function application, i.e., $(C_j \circ \mathcal{L}_h^a)(x) = C_j\left(\mathcal{L}_h^ax\right)$.
+The objective of the hybrid solver is to select a sequence of solvers that minimize the error norm after $T$ steps or $\|e^{(T)}_h\|_2^2$. For a sequence $S = (S_1, \dots, S_T)$ of solver indices,  we seek to solve 
+\begin{equation} \label{eq:errorobjective}
+    \min_{S_t \in [K], |S| \leq T} h(S) := \left\|\left(I - C_{S_{|S|}} \circ \mathcal{L}_h^a\right) \circ \dots \circ \left(I - C_{S_1} \circ \mathcal{L}_h^a\right)  \left(e^{(0)}_h \right)\right\|^2_2
+\end{equation}
+with compositions applied from right to left, so that the $S_1$ update acts on the initial error.
+% Here, the product is ordered from right to left (i.e. from $t = 1$ to $t = |S|$), reflecting the sequential application of the preconditioners. 
+
+% If running each solver $C_{j}$ incurs a time cost $c_j$, we can formulate a budget constrained optimization problem
+% \begin{align*}
+%     \min_{S \in [1, K]^*} & h(S) \\
+%     \text{subject to} \quad &\sum_{t = 1}^T c_{i_t} \leq B
+% \end{align*}
+
+% where $B$ is the total computational budget.
+
+\section{Greedy Algorithm} \label{sec:greedy}
+
+\Cref{eq:errorobjective} defines a combinatorial optimization problem with a search space exponential in $T$, rendering exact optimization intractable for large $T$ or $K$. As a starting point, we propose and analyze an ``omniscient'' greedy algorithm that assumes access to the true initial error $e^{(0)}_h$. This is unrealistic--if $e^{(0)}_h$ were known, one could recover the solution immediately via $u_h = u^{(0)}_h + e^{(0)}_h$, but it provides a clean benchmark.
+In \Cref{sec:approxgreedy}, we relax this assumption using a practical learning strategy that is Bayes consistent with this omniscient approach, thereby recovering the suboptimality guarantees shown below.
+
+As discussed in \Cref{sec:bggreedy}, when supermodularity and monotonicity hold, the greedy rule--such as the one described in \Cref{alg:greedy}--enjoys constant-factor approximation guarantees. However, classical results focused on \textit{set} functions, with only recent extensions made to sequences. Building on this line, we introduce a sequence-based notion of weak supermodularity.
+
+\begin{algorithm} 
+\caption{Greedy Algorithm for a Hybrid PDE solver}\label{alg:greedy}
+\begin{algorithmic}
+\Require $\{C_{j}\}_{j = 1}^{K}, T, \mathcal{L}_h^a, e^{(0)}_h$
+\State $S^{0} \gets \emptyset$
+\For{$t < T$}
+    \State $S^{t + 1} \gets S^{t} \ \oplus \argmin_{j \in [K]}\|( I - C_{j} \circ \mathcal{L}_{h}^a)(e^{(t)}_h)\|^2_2$
+    \State $e^{(t + 1)}_h \gets (I - C_{S_{t+ 1}} \circ \mathcal{L}_{h}^a) (e^{(t)}_h)$
+\EndFor
+\State \Return $S^{T}$
+\end{algorithmic}
+\end{algorithm}
+
+Let $\Omega^*$ denote the space of sequences with elements in $\Omega$. For $S = (S_1, \dots, S_n) \in \Omega^*$,  $S' = (S_1', \dots, S_m') \in \Omega^*$, we denote their concatenation as $S \oplus S' = (S_1, \dots, S_n, S_1', \dots, S_m')$. $S$ is a prefix of $S'$ or $S \preceq S'$ if $S' = S \ \oplus L$ for some $L \in \Omega^*$.
+% If $S' = S \ \oplus L$ for some $L \in \Omega^*$, then $S$ is a prefix of $S'$ (denoted as $S \preceq S'$).
+A sequence function $g: \Omega^* \to \mathbb{R}$ is considered prefix monotonically non-increasing if $g(S \ \oplus S') \leq g(S)$ for all $S, S' \in \Omega^*$, and postfix monotonically non-increasing if $g(S' \ \oplus S) \leq g(S)$ for all $S, S' \in \Omega^*$. A prefix non-increasing function $g$ is sequence supermodular if, for all $S', S \in \Omega^*: S \preceq S'$, it holds that
+\begin{equation}\label{eqn:supermod}
+    g(S) - g(S \ \oplus \omega ) \geq g(S') - g(S' \ \oplus \omega ), \quad \forall \omega \in \Omega
+\end{equation}
+
+However, $h(S)$ (described in \Cref{eq:errorobjective}) may not, in general, satisfy this property. Therefore, we introduce weak sequence supermodularity. A prefix non-increasing function $g$ is weakly supermodular with respect to $S' \in \Omega^*$ if, for any $S \in \Omega^{|S'|}$, there exists $\alpha(S') \geq 1$ such that
+\begin{equation}\label{eqn:alpha_supermod}
+     g(S) - g(S\ \oplus S') \leq \alpha(S') \sum_{i \in [|S'|]} g(S) - g(S \ \oplus S'_i)
+\end{equation}
+The parameter $\alpha(S')$ or the supermodularity ratio quantifies deviation from exact sequence supermodularity.
+Expanding the $g(S) - g(S\ \oplus S')$ as a telescoping sum 
+$\sum_{i = 1}^{|S'|} g(S \ \oplus \left(S'_1, \dots, S'_{i - 1}\right)) - g(S \ \oplus \left(S'_1, \dots, S'_{i}\right))$
+% $$g(S) - g(S\ \oplus S')=\sum_{i = 1}^{|S'|} g(S \ \oplus \left(S'_1, \dots, S'_{i - 1}\right)) - g(S \ \oplus \left(S'_1, \dots, S'_{i}\right))$$ 
+% Each term represents 
+shows that the marginal decrease from appending $S_i'$ after its predecessors
+% . Weak supermodularity ensures that each of these marginal terms 
+is controlled by the effect of appending $S_i'$ directly to $S$. Thus, postponing the inclusion of $S_i'$ cannot yield a significantly larger benefit compared to adding it earlier. The supermodularity ratio $\alpha(S)$ quantifies the extent to which future gains from delays may exceed immediate gains. 
+% \sahana{I may not need this. will discuss later}
+% $g$ is considered weakly-$\mu$-postfix monotonic if for all $S, S' \in \Omega^*$, 
+% \begin{equation*}
+%     g(S' \ \oplus S) \leq \mu g(S)
+% \end{equation*}
+% Intuitively, $\mu$ is a ``slack'' for the factor by which $g$ violates the standard postfix monotonicity; hence, $\mu\ge 1$, with $\mu=1$ recovering standard postfix monotonicity. 
+% for any $\omega \in \Omega$. However, the objective function $h(S)$ described in \Cref{eq:errorobjective} may not, in general, satisfy this property. Therefore, we introduce weakly-$\alpha$-supermodularity for sequences. A prefix non-increasing function $g$ is weakly-$\alpha$-supermodular for sequence length $T$ if, for any $S, S' \in \Omega^T$ such that $|S'| = T$, 
+% \begin{equation}\label{eqn:alpha_supermod}
+%      g(S) - g(S\ \oplus S') \leq \alpha T \max_{i \in [|S'|]} g(S) - g(S \ \oplus S'_i)
+% \end{equation}
+
+% See \Cref{sec:proofalpha=1} for a formal proof of this equivalence between \Cref{eqn:alpha_supermod} and \Cref{eqn:supermod} for the $\alpha=1$ case
+% If we ignore the summation, by satisifying weak supermodularity, we can expect $g(S \ \oplus \left(S'_1, \dots, S'_{i - 1}\right)) - g(S \ \oplus \left(S'_1, \dots, S'_{i}\right)) \leq \alpha(S')\left(g(S) - g(S \ \oplus S'_i)\right)$ which basically says that there is no benefit of appending $S_i'$ in the future as opposed to a earlier timestep
+
+% To see this, notice that for $\alpha=1$, \Cref{eqn:alpha_supermod} captures the notion that the total effect of concatenating a $T$-length sequence $S'$ cannot improve upon $T$ repeats of the single best step. In other words, there is no way for consecutive steps to ``complement'' one another to accrue a better improvement than the two steps individually combined. See \Cref{sec:proofalpha=1} for a formal proof of this equivalence between \Cref{eqn:alpha_supermod} and \Cref{eqn:supermod} for the $\alpha=1$ case. Thus, for $\alpha > 1$, such complementarity of steps is permitted but only within a bounded factor. Intuitively, therefore, the higher $\alpha$, the more it is possible there will be some long-range complementarity of the selection of actions that render greedy selection suboptimal.
+
+% where $\alpha \geq 1$. When $\alpha = 1$, the functions is sequence supermodular (See \Cref{sec:proofalpha=1} for proof)
+
+Having introduced these notions, we now characterize the suboptimality of greedy solutions of weakly supermodular and 
+postfix monotonic sequence functions in \Cref{th:suboptgreedy}.
+% and subsequently discuss the interpretation of such results.
+% \Cref{th:suboptgreedy} characterizes the suboptimality of greedy solutions to weakly-$\alpha$-supermodular, prefix monotonic, and weakly-$\mu$-postfix monotonic sequence functions. 
+\begin{theorem} \label{th:suboptgreedy}
+    Let $g: \Omega^* \to \mathbb{R}$ be a weakly supermodular function with respect to the optimal solution $O = \argmin_{S \in \Omega^T} h(S)$ with a supermodularity ratio of $\alpha(O)$ and 
+    % weak-$\mu$-
+    postfix monotonicity. Let the greedy solution of length $T$ be $S^T$. If $\phi_T(\alpha) =  \left(1 - \frac{1}{\alpha T}\right)^T$, then
+    \begin{equation*}
+        g(S^T) \leq  \left(1 - \phi_T(\alpha(O))\right)
+        g(O) +  \phi_T(\alpha(O))g(\emptyset)
+    \end{equation*}
+    % Equivalently, %\sahana{stuff below is wrong}
+    % \begin{equation*}
+    %     \frac{g(\emptyset) - g(S^T)}{g(\emptyset) - \mu g(O)} \geq \left(1 - \left(1 - \frac{1}{\alpha T}\right)^T\right) \geq \left(1 - \frac{1}{e^{\alpha}}\right)
+    % \end{equation*}
+\end{theorem}
+
+The proof of \Cref{th:suboptgreedy} appears in \Cref{sec:proofsuboptgreedy}. As $T \to \infty$, the factor $1 - \phi_T(\alpha(O))$ decreases to $1 - e^{-1/\alpha(O)}$, so the worst-case performance of the greedy rule saturates with horizon rather than degrading indefinitely. Additionally, larger $\alpha(O)$, which indicates higher reward for delayed inclusions, loosens the suboptimality bound.  
+% $\alpha(O) \to\infty$, the bound loosens, reflecting stronger long-range dependencies where delaying beneficial inclusions is rewarded more.
+\Cref{th:suboptgreedy} requires that the sequence objective $h$ be weakly supermodular with respect to the optimal solution and postfix monotone--properties established in Proposition \ref{th:weaklyalphasupermodular}. We defer the proof to \Cref{sec:proofweaklyalphasupermodular}.
+
+\begin{proposition} \label{th:weaklyalphasupermodular}
+    Suppose that for all $j \in [K]$, the error propagation function $I - C_j \circ \mathcal{L}_h^a$ is $\rho_j$-Lipschitz continuous with $\rho_j < 1$, and that $(I - C_j \circ \mathcal{L}_h^a) (0_N) = 0_N$. Then, the function $h$ is weakly supermodular with respect to the optimal solution $O$, with $$\alpha(O) = \max\left\{\frac{4}{T - \sum_{i = 1}^{T} \rho_{O_i}^2} , 1\right\}$$Furthermore, if $I - C_j \circ \mathcal{L}_h^a$ is invertible for all $j \in [K]$, $h$ is also postfix non-increasing.
+\end{proposition}
+The conditions of Proposition \ref{th:weaklyalphasupermodular} are quite natural. For classical solvers, the Lipschitz constant is $\|I_N - C_j \mathcal{L}^a_h\|$, which is usually less than $1$
+% whenever the update dampens errors--a property that 
+for well-posed linear elliptic PDEs (i.e., the update is damping errors). 
+For neural networks, Lipschitz continuity can be enforced via weight regularization \citep{gouk2021regularisation} and a sufficiently trained model should approximate $(\mathcal{L}^a_h)^{-1}$ well enough to make the Lipschitz constant small.
+% Similarly, a neural network can be trained to be Lipschitz continuous in its inputs by applying appropriate regularization techniques to its weights \citep{gouk2021regularisation}. A small Lipschitz constant implies that the preconditioning function closely approximates the inverse of $\mathcal{L}^a_h$, so a sufficiently well-trained model should satisfy the Lipschitz constant inequality. 
+The requirement $(I - C_j \circ \mathcal{L}_h^a) (0_N) = 0_N$
+% The condition that each preconditioning function maps $0_N$ to $0_N$ 
+is both natural and desirable: it precludes spurious updates when the residual $f_h - \mathcal{L}^a_h u_h^{(t)}$ is $0$. This holds by design for classical schemes, and it can be enforced for any learned model by excluding bias terms.
+
+The form of $\alpha(O)$ in Proposition \ref{th:weaklyalphasupermodular} highlights that the suboptimality factor in \Cref{th:suboptgreedy} is governed by the collective contraction factors of the solvers chosen by the optimal solution: as $\sum_{i = 1}^{T} \rho_{O_i}^2 \to T$, $\alpha(O)$ grows, resulting in a weaker bound. 
+% This reflects the fact that when all solvers in the optimal sequence are close to the boundary of stability ($\rho_{O_i} \approx 1$), weak supermodularity degrades and greedy performance suffers. 
+Invertibility of the error propagation functions is often satisfied with Jacobi and Gauss-Seidel updates. However, widely-used solvers like two-grid corrections and neural networks with dimension changes or ReLU activations may yield non-invertible error propagation functions. Nevertheless, our experiments show that greedy routers remain effective even when invertibility is not met. 
+
+
+% in classical solvers, when the residual is $0$, the additive term in \Cref{eq:iterativeupdate} vanishes, ensuring no further correction when convergence to the true solution is achieved. For neural networks, this property holds as long as there are no bias terms included.
+% Proposition \ref{th:weaklyalphasupermodular} thus ensures that all the conditions required by \Cref{th:suboptgreedy} are satisfied as long as no solver in $\mathcal{C}$ amplifies errors.
+% Notably, any well-trained neural operator is expected to reduce the error norm, and traditional solvers such as Jacobi and Gauss-Seidel are known to exhibit this error-reducing property for linear elliptic PDEs under standard conditions. 
+% \subsection{Suboptimality of Greedy Sequence Minimization}
+
+% \sahana{do we need this stuff below?}
+\Cref{th:suboptgreedy} thus indicates that the approximation guarantee is strongest when the sequence is nearly supermodular ($\alpha(O) \approx 1$). Generally, if all error propagation maps share an eigenbasis,
+% the original problem reduces to an allocation problem--
+supermodularity is established.
+This occurs, for example, for linear, constant-coefficient PDEs with periodic boundary conditions where the solver ensemble includes Jacobi, Gauss-Seidel, and  a single-layer linear Fourier Neural Operator. 
+% his occurs when the error propagation matrices share an eigenbasis. This happens with linear, constant-coefficient PDEs with periodic boundary conditions. and the collection of solvers are Jacobi, Gauss-Seidel, a single-layer linear Fourier Neural Operator
+% This occurs, for example, for linear, constant-coefficient PDEs with periodic boundary conditions, where the Jacobi and Gauss-Seidel error propagators are circulant and hence diagonalizable by the discrete Fourier transform. Likewise, a single-layer linear Fourier Neural Operator is diagonal in the Fourier basis.
+% Generally, if all error propagation maps $\left(I - C_j \mathcal{L}_{h}^a\right)$ share an eigenbasis,
+% % the original problem reduces to an allocation problem--
+% supermodularity is established. 
+The proof of \Cref{th:simultaneoussupermodular} is deferred to \Cref{sec:proofsimultaneoussupermodular}.
+\begin{proposition} \label{th:simultaneoussupermodular}
+    Let $\|I_N - C_j\mathcal{L}_h^a\| \leq 1$ for all $j \in [K]$ and $\left(I - C_j \mathcal{L}_{h}^a\right) = P\Lambda_jP^{-1}$. Then, $h$ is supermodular. 
+\end{proposition}
+
+
+\section{Approximate Greedy Router} \label{sec:approxgreedy}
+
+The results in \Cref{sec:greedy} indicate that the error reduction from the greedy solution closely matches that of the optimal sequence, but this is predicated on having an accurate estimate of the initial error, $e^{(0)}_h$. A poor approximation of $e^{(0)}_h$ can result in miscalibrated decisions, causing errors to amplify over subsequent steps. To remedy this, we design a router $r$ that learns to select solvers myopically, as described in \Cref{alg:greedy}, without access to the true initial error. 
+
+We adopt the following learning setup. Let $\mathcal{A}, \mathcal{F}, \mathcal{U} \subseteq \mathbb{R}^N$ denote the spaces of coefficient, forcing, and solution functions on the grid $G_h(D)$. We assume an application-specific data distribution $\mathcal{P}_{\mathcal{A} \times \mathcal{F}}$ over $\mathcal{A} \times \mathcal{F}$ that reflects test time conditions.
+% the coefficients and forcings the router expects to encounter at deployment.
+During training, $(a_h, f_h)$ is drawn from $\mathcal{P}_{\mathcal{A} \times \mathcal{F}}$, and a high-accuracy reference solution $u_h$ is computed, providing the true per-step error. The router $r$ is learned offline on this data; at test time, it operates without access to true errors.
+
+% Let $\mathcal{P}_{\mathcal{A} \times \mathcal{F}}$ denote the data-generating distribution 
+% \ambuj{this seems a bit abrupt -- what is *the* data generating distribution? where does it come from? ppl are used to think of solving PDEs as smth that works for every input. why is it okay to assume a distribution here? you need to properly set things up so that it is clear to the reader that there will be training phase when the router will be learned (and at the training stage we have access to the true error) and then it will be deployed. otherwise, this section might be very confusing}. 
+
+At each time step $t$, $r$ selects a solver using the coefficient $a \in \mathcal{A}$, forcing $f \in \mathcal{F}$, and the current iterate $u^{(t)} \in \mathcal{U}$. If $r(a_h, f_h, u^{(t)}_h) = j$, the next iterate is computed with solver $j$, resulting in an error of $\|( I - C_{j} \circ  \mathcal{L}_{h}^a)(e^{(t)}_h)\|^2_2$. Learning such a router requires minimizing the following loss:
+\begin{equation} \label{eq:routerloss}
+    l_{\text{route}}\left(r, a_h, f_h, u^{(t)}_h, u_h\right) = \sum_{j = 1}^K \left\|\left( I - C_{j} \circ \mathcal{L}_{h}^a\right)\left(u_h - u^{(t)}_h\right)\right\|^2_2\1_{r(a_h, f_h, u^{(t)}_h) = j}
+\end{equation}
+The corresponding $l_{\text{route}}$-risk is defined as $\mathcal{R}_{\text{route}}\left(r\right) = \mathbb{E}_{a_h, f_h \sim \mathcal{P}_{\mathcal{A} \times \mathcal{F}}}[l_{\text{route}}(r, a_h, f_h, u^{(t)}_h, u_h)]$.  
+For analysis, we fix the iterate generation via a teacher-forcing \citep{williams1989learning,lamb2016professor}: during training, 
+% Teacher forcing is a training strategy for sequence models in which, at each step, the model is fed the ground-truth previous output rather than its own previous prediction. 
+the iterates fed to the router are produced by an oracle greedy rollout, not by the router's own past choices. Formally, with $u_h^{(0)} = 0_N$, for $t \geq 1$, 
+$$j^*_t \in \text{argmin}_{j \in [K]} \left\|\left( I - C_{j} \circ \mathcal{L}_{h}^a\right)\left(e^{(t - 1)}_h\right)\right\|^2_2, \quad u^{(t)}_h = u^{(t - 1)}_h + C_{j^{*}_t}\left(f_h - \mathcal{L}_h^a u_h^{(t - 1)}\right)$$
+Thus, $\{u^{(t)}_h\}$ is a deterministic function of $(a_h, f_h)$. At each $t$, $l_{\text{route}}$ is evaluated on $r(a_h, f_h, u^{(t)}_h)$ which takes in the teacher-forced iterate. Finally, the greedy choice $j^*_{t + 1}$ is used to advance $u^{(t + 1)}_h$. Thus the input distribution seen by $r$ depends on $(a_h, f_h)$, not on the router's predictions. However, full teacher forcing induces a distributional mismatch at test time (exposure bias). In experiments, we mitigate this with scheduled sampling \citep{bengio2015scheduled}; see \Cref{sec:training details} for details.
+
+% The router then makes a decision using the greedy decision from the previous step and $a_h, f_h$, the loss is evaluated and the next time step is again teacher forcer
+% We emphasize that a distribution over all solution functions is not needed here, since each solution is fully determined by $(a_h, f_h)$. By construction, the entire sequence $\{u^{(t)}_h\}$ is fully determined by $a_h, f_h$, and the initial guess $u^{(0)}_h$. In this work, we assume that $u^{(0)}_h$ is generated by a neural operator, making it a deterministic function of $a_h$ and $f_h$. 
+
+Minimizing $\mathcal{R}_{\text{route}}\left(r\right)$ yields the following Bayes-Optimal Router:
+\begin{equation}\label{eq:bayesoptimalrouter}
+    r^*(a_h, f_h, u^{(t)}_h) \in \text{argmin}_{j \in [K]} \left\|\left( I - C_{j} \circ \mathcal{L}_{h}^a\right)\left(e^{(t)}_h\right)\right\|^2_2
+\end{equation} 
+which aligns with the decision rule in \Cref{alg:greedy}. Hence, $l_{\text{route}}$ is consistent with learning the greedy algorithm.
+
+\subsection{Surrogate Loss}
+
+Since \Cref{eq:routerloss} is discontinuous and non-convex, direct minimization is intractable in practice. To overcome this, we introduce a surrogate loss that satisfies three key properties: (1) convexity, enabling efficient optimization; (2) serving as an upper bound on the original loss; and (3) Bayes consistency, ensuring the Bayes optimal decision of the original loss is preserved upon minimization. Formally, a surrogate $\phi$ is considered to be Bayes consistent with respect to the loss $l$ if 
+\begin{equation*}
+    \lim_{n \to \infty} \mathcal{R}_{\phi}(f_n) - \mathcal{R}_{\phi}^* \implies \lim_{n \to \infty} \mathcal{R}_{l}(f_n) - \mathcal{R}_{l}^* 
+\end{equation*}
+where $\mathcal{R}_{l}(f) = \mathbb{E}\left[l(f(X), Y)\right]$ and $\mathcal{R}_{l}^* = \inf_f\mathcal{R}_{l}(f)$. In other words, in the limit of infinite data, if the risk of a sequence of learned hypotheses $\{f_n\}$ converges to the optimal risk under $\phi$, it also converges to the optimal risk with respect to the original loss $l$.
+
+To define a surrogate loss for the routing problem, consider a set of scoring functions $\mathbf{g} =\{g_j\}_{j = 1}^K$ with $g_j: \mathcal{A} \times \mathcal{F} \times \mathcal{U} \to \mathbb{R}$ and we define the router as $r(a, f, u^{(t)}) = \text{argmax}_{j \in [K]} g_j(a, f, u^{(t)})$. For example, $\mathbf{g}$ can be a neural network with $K$ outputs. Then, minimizing the following surrogate loss yields the same decision as minimizing \Cref{eq:routerloss}:
+\begin{equation} \label{eq:routersurrogate}
+    \Psi\left(\mathbf{g}, a_h, f_h, u^{(t)}_h, u_h\right) = -\sum_{j = 1}^K \sum_{k = 1}^K\Tilde{c}_k(a_h, u^{(t)}_h, u_h)\1_{k\neq j}\log\left(\frac{\exp\left(g_j(a, f, u^{(t)})\right)}{\sum_{m = 1}^K\exp\left(g_m(a, f, u^{(t)})\right)}\right)
+\end{equation}
+where $\Tilde{c}_j(a_h, u^{(t)}_h, u_h) = \|( I - C_{j} \circ \mathcal{L}_{h}^a)(u_h - u^{(t)}_h)\|^2_2$.
+% where 
+% $\psi\left(\mathbf{g}(a, f, u^{(t)}),j\right)$ is a consistent surrogate for the multiclass $0/1$ loss and 
+% $\Tilde{e} = \max_{j \in [1, K]} \left\|\left( I_N - C_{j} \mathcal{L}_{h}\right)e^{(t)}\right\|^2_2$. 
+The $\Psi$-risk is denoted by $\mathcal{R}_{\Psi}(\mathbf{g}) = \mathbb{E}_{a_h, f_h \sim \mathcal{P}_{\mathcal{A} \times \mathcal{F}}}[\Psi(\mathbf{g}, a_h, f_h, u^{(t)}_h, u_h)]$. The convexity of $\Psi$ with respect to $\mathbf{g}$ follows from the convexity of log-softmax function in its inputs. Moreover, $\Psi$ upper bounds $l_{\text{route}}$ up to a constant factor, and we refer the reader to \Cref{sec:proofupperbound} for the proof. Finally, \Cref{th:consistency} shows that $\Psi$ achieves Bayes consistency with respect to $l_{\text{route}}$; the proof can be found in \Cref{sec:proofconsistency}.
+
+\begin{theorem} \label{th:consistency}
+    Let $\Tilde{c}_j(a_h, u^{(t)}_h, u_h) < \Bar{E} < \infty$  for all $j \in [K]$. If there exists $j\in [K]$ such that $\Tilde{c}_j(a_h, u^{(t)}_h, u_h) > E_{min} > 0$, then, for any collection of solvers $\{C_j\}_{j= 1}^K$ and linear discrete operator $\mathcal{L}_h^a$, $\Psi$ is Bayes consistent surrogate for $l_{\text{route}}$.
+\end{theorem}
+\Cref{th:consistency} is a cost-sensitive analogue of the classical Bayes-consistency of multiclass cross-entropy for 0-1 loss: in the infinite-sample limit, minimizing cross-entropy recovers the true conditional class probabilities, so the induced decision is Bayes optimal. Our result extends this to cross-entropy with instance-dependent weights $\sum_{k \neq j}^K\Tilde{c}_k(a_h, u^{(t)}_h, u_h)$. The uniform upper bound holds when all preconditioning functions are error-damping. It is also reasonable to assume at least one solver cannot annihilate the error in one step, yielding the lower bound. Under these conditions, minimizing $\Psi$ recovers the Bayes-optimal router of \Cref{eq:bayesoptimalrouter}, i.e., the greedy solution of \Cref{eq:errorobjective}. Following the work of \citet{mao2024regression}, the proof uses standard conditional-risk calibration: we relate the excess risks of $l_{\text{route}}$ and $\Psi$ and take the infinite-sample limit.
+% \ambuj{ we should demystify the consistency result a bit -- if we had no weights and our non-convex loss was just 0-1 loss then this result simply follows from the fact that cross-entropy loss is proper: in the limit of infinite data, you'll learn the true probabilities of all labels and therefore argmaxing over them will yield the Bayes classifier. The result above is more general because we have costs weightings $\tilde{c}_j$ but the spirit is the . also, how much new work do we have to do beyond Mao-Mohri-Zhong? prolly a sentence on what it took to prove this will also help}
+
+
+% \sahana{maybe a generalization bound here}
+
+\section{Related Works}
+
+\paragraph{Hybrid PDE Solvers:}
+Early data-driven solvers sought convergence guarantees by predicting parameters--e.g., preconditioning matrices $C$, multi-grid smoothers or restriction matrices--within iterative schemes \citep{taghibakhshi2021optimization,caldana2024deep,kopanivcakova2025deeponet,huang2022learning,katrutsa2020black}. These works, however, do not leverage the neural surrogates' ability to generalize across varying coefficients and/or forcings highlighted in \Cref{sec:neuraloperators} and thus, offer only modest speedups over classical solvers. HINTS \citep{zhang2024blending} introduced hybrid solvers that interleave a classical method with a pre-trained DeepONet on a fixed schedule (e.g., 24 Jacobi steps, then one DeepONet correction).
+% served as the foundational work in iteratively solving PDEs like \Cref{eq:mainpde} using deep learning models. 
+% It couples a single classical method (e.g., Jacobi or Gauss-Seidel) with a pre-trained DeepONet and uses a fixed schedule (e.g., 24 Jacobi steps, then one DeepONet correction)
+% The interleaving schedule is fixed; for instance, in the Jacobi-DeepONet variant, 24 update steps of the Jacobi solver are followed by one DeepONet correction. 
+Despite this rigidity, HINTS reports significantly faster convergence than the standalone numerical solver. 
+% Many works have expanded upon the HINTS methodology.
+\citet{kahana2023geometry} adapted HINTS to geometries distinct from, but related to, those used to train the neural operator. Both \citet{hu2025hybrid} and \citet{cui2022fourier} characterized the dampening of error modes over iterates, with the former replacing the DeepONet of HINTS with an MIONet \citep{jin2022mionet} and the latter a Fourier Neural Operator \citep{li2020fourier}. Critically, these hybrid solvers are limited in two ways: they, firstly, only complement the trained surrogate with a \textit{single} numerical solver, and secondly interleave the numerical and neural solvers with a fixed, heuristic schedule. These were the primary shortcomings that we addressed in our proposed method, which result in significant empirical improvements, as we demonstrate in \Cref{sec:experiments}.
+
+
+\paragraph{Model Routing:} Routing \citep{shnitzer2023large,hu2024routerbench,ding2024hybrid,huang2025routereval} seeks to find, for each input, a model from a fixed set that optimizes a task metric under cost or latency constraints. Simple heuristics--e.g., thresholding a cheap model's uncertainty estimates \citep{chuang2024learning,chuang2025confident}--often poorly balance the cost-accuracy tradeoff. Consequently, many systems learn a router network, which maps a query to the model index expected to perform best \citep{hari2023tryage,mohammadshahi2024routoo,vsakota2024fly}. Abstractly, our method also learns a router, but over numerical and neural solvers for PDEs at the iteration level. Our work is the first to demonstrate that routing is applicable to the problem of learning hybrid PDE solvers, differing from prior hybrid solver works, which simply fixed the ``router'' to a predetermined schedule. We additionally exploit the algebraic structure of PDE solvers to derive theoretical guarantees for our routing strategy in \Cref{sec:greedy}, unlike typical model-routing settings.
+
+\paragraph{Mixture of Experts:} Classical mixture-of-experts (MoE) \citep{jacobs1991adaptive,jordan1994hierarchical} uses a gating network to assign soft or hard weights to a set of experts and produce a weighted combination of their outputs, with the gate and experts trained jointly. In modern LLM systems, MoE instead performs sparse, token-level routing to a small subset of in-layer experts, enabling large model capacity without proportional compute, typically with load-balancing and capacity constraints \citep{shazeer2017outrageously,lepikhin2020gshard,fedus2022switch,jiang2024mixtral}. 
+Our method can be regarded as gating network of a different kind where our ``experts'' or solvers are not trained jointly with the router and single router is reused across the iteration horizon, in contrast to MoE which commonly employs layer-specific gates.
+
+
+
+% This novel application further enabled us to establish the theoretical underpinnings in \Cref{sec:greedy} of our routing strategy 
+% provide the detailed error characterizations presented , 
+% which is uniquely possible in our setting, given the formal characterization for PDE numerical solvers compared to LLM responses. 
+% In addition, our surrogate loss of \Cref{eq:routersurrogate} directly optimizes the iterate errors, whereas alternative works on model routing for LLMs are often trained against a cross-entropy loss on labels identifying the optimal model.
+
+\section{Experiments}\label{sec:experiments}
+
+In this section, we empirically demonstrate the fast, uniform convergence of the approximate greedy router on Poisson and Helmholtz equations posed on the unit domain $D = [0, 1]^d$ with $d\in \{1, 2\}$ .
+% \ambuj{HINTS did $d=3$ also? if so, why are we no doing that?} 
+For Poisson, we use the constant-coefficient model
+$$- \Delta u(x) = f(x), \quad x\in D$$ and for Helmholtz, we adopt the sign convention 
+$$-\Delta u(x) - a^2(x)u(x) = f(x), \quad x\in D$$ where $a^2(x) \geq 0$. We impose periodic boundary conditions for both equations: for Poisson, the right-hand side is centered to satisfy the compatibility condition $\int_D f(x)dx = 0$. The domain $D$ is discretized on uniform grids with $65$ points in 1D and a $33 \times 33$ grid in 2D. 
+% The discrete Laplacian $\Delta_h$ are the standard three-point (1D) 
+% $\begin{bmatrix}
+%     1 & -2 & 1
+% \end{bmatrix}$ 
+% stencil and five-point (2D) 
+% $\begin{bmatrix}
+%     0 & -1 & 0 \\
+%     1 & -4 & 1 \\
+%     0 & -1 & 0
+% \end{bmatrix}$ 
+% stencils.
+Data is sampled from a zero-mean Gaussian Random Field on the periodic domain with covariance operator $(- \Delta + 9I)^{-2}$. We run two experiments: (i) compare our greedy method to HINTS and single-solver baselines, and (ii) assess how performance scales as the solver ensemble grows. For both experiments, the performance across $64$ test samples is reported via the mean final error $\|e^{(T)}_h\|_2$ and the mean area under the curve (AUC), where $\text{AUC} = \sum_{t = 1}^T\|e^{(t)}_h\|_2$. While the final errors is of utmost importance, AUC captures performance over the entire run--smaller values indicate lower error at all intermediate steps--and naturally penalizes non-monotone spikes that undo progress.
+
+
+\paragraph{Comparing Greedy with HINTS:} For this experiment, we consider Jacobi, Gauss-Seidel (GS), and multigrid (MG) solvers along with a DeepONet model. As baselines, we use single-solver schedules (Jacobi only, GS only, and MG only) as well as HINTS variants with each classical solver (HINTS-Jacobi, HINTS-GS, HINTS-MG), where the DeepONet correction is interleaved every 24 Jacobi/GS iteration or every 14 MG V-cycles. We then train LSTM-based routers using the loss in \Cref{eq:routersurrogate} under three different solver-access sets: Jacobi+DeepONet (Greedy-Jacobi), GS+DeepONet (Greedy-GS), 
+% GS+Jacobi+DeepONet (Greedy-GS,Jacobi),
+and MG+DeepONet (Greedy-MG). We use an LSTM because solver routing is sequential and the benefit of a greedy step depends on the trajectory of errors and past choices. LSTMs have historically performed well on sequence data owing to their recurrent memory. Training details of the DeepONet and the routers can be found in \Cref{sec:training details}. 
+
+We note that comparisons are restricted to methods with the same solver access. For example, Greedy-Jacobi and HINTS-GS are not comparable because the former lacks access to GS. Accordingly, we partition results by solver family (Jacobi-related, GS-related, and MG-related). Each method is run for 300 iterations (Jacobi/GS) or 100 V-cycles (MG).
+% \Cref{fig:errorcomparison} shows the convergence history of a representative solution function, and \Cref{tab:errorcomparison} reports final error and mean AUC.
+
+% the performance across $64$ test samples via the mean final error $\|e^{(T)}_h\|^2_2$ and the mean area under the curve (AUC), where $AUC_T = \sum_{t = 1}^T\|e^{(t)}_h\|^2_2$. While the final errors is of utmost importance, AUC captures performance over the entire run--smaller values indicate lower error at all intermediate steps--and naturally penalizes non-monotone spikes that undo progress. 
+
+
+% where all solvers are compared under different metrics.
+\begin{table}[]
+    \centering
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{|c|c|c|c|c|c|c|c|c|}
+        \hline
+         Equation & \multicolumn{2}{|c|}{1D Poisson} & \multicolumn{2}{|c|}{2D Poisson} & \multicolumn{2}{|c|}{1D Helmholtz}& \multicolumn{2}{|c|}{2D Helmholtz} \\
+         \hline 
+         Methods & $\|e^{(T)}_h\|$ & AUC & $\|e^{(T)}_h\|$ & AUC& $\|e^{(T)}_h\|$ & AUC & $\|e^{(T)}_h\|$ & AUC\\
+         \hline
+         \multicolumn{9}{|c|}{Jacobi-related Solvers} \\
+        \hline
+        Jacobi Only & 0.19 (0.1) & 128.66 (69.98) & 0.07 (0.03) & 115.5 (42.96) & 0.22 (0.11) & 146.57 (76.11)  & \textbf{0.066 (0.03)} & \textbf{110.485 (41)}\\
+        HINTS-Jacobi & 0.01  & 22.71 (11.36) & 0.18 & 65.75 (8.61) & 0.048 (0.02) & 29.36 (13.21) & 0.11 (0.03) & 115.84 (41.36) \\
+        Greedy-Jacobi &\textbf{0.001} & \textbf{1.12 (0.44)} & \textbf{0.01}  & \textbf{18.48 (4.06)} & \textbf{0.025 (0.03)} & \textbf{8.105 (8.22)} & \textbf{0.066 (0.03)} & \textbf{110.485 (41)}\\
+        \hline
+         \multicolumn{9}{|c|}{GS-related Solvers} \\
+         \hline
+        GS Only & 0.05 (0.03) & 80.55 (43.83) & 0.005  & 61.67 (23.02) & 0.054 (0.03) & 91.153 (47.35) & \textbf{0.005 (0.002)} & \textbf{58.801 (21.892)} \\
+    HINTS-GS & 0.003  & 17.8 (9.21) & 0.174 & 56.63 (7.75) &0.041 (0.01) & 26.638 (11.59) & 0.056 (0.003) & 64.445 (21.986)\\
+    Greedy-GS & $\mathbf{<10^{-3}}$ & \textbf{0.674 (0.27)} & \textbf{0.001} & \textbf{9.9 (2.26)} & \textbf{0.015 (0.01)} & \textbf{5.157 (3.96)} & \textbf{0.005 (0.002)} & \textbf{58.801 (21.892)}\\
+        \hline
+         \multicolumn{9}{|c|}{MG-related Solvers} \\
+         \hline
+         MG Only & 0.05 (0.01) & 20.51 (7.46) & 0.002 & 10.97 (3.03) & 0.05 (0.01) & 22.042 (7.8) & \textbf{0.011 (0.009)} & \textbf{10.745 (3.094)}\\
+        HINTS-MG & 0.002  & 7.64 (3.66) & 0.079 & 15.02 (2.03) & 0.023 (0.01) & 9.872 (4.32)& 0.026 (0.008) & 11.763 (2.976)\\
+        Greedy-MG & $\mathbf{<10^{-3}}$ & \textbf{0.24 (0.1)} & \textbf{0.001} & \textbf{2.58 (0.54)} & \textbf{0.016 (0.01)} & \textbf{1.784 (1.32)} & \textbf{0.011 (0.009)} & \textbf{10.745 (3.094)}\\
+         \hline
+    \end{tabular}
+    }
+    \caption{Final error and AUC of squared $L^2$ error (lower is better). Values are mean ($\pm$ standard error (s.e.)) over 64 test instances; both mean and s.e. are reported in $\times 10^{-3}$. If a standard error is not shown, it is $< 10^{-3}$ in the reported units (raw $< 10^{-6}$). Bold indicates the best method within each solver family.}
+    \label{tab:errorcomparison}
+\end{table}
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.8\linewidth]{images/2dpoisson1dhelmholtz.png}    \caption{Convergence histories for representative test instances. Rows: 2D Poisson (top) and 1D Helmholtz (bottom). Columns: Jacobi, Gauss–Seidel (GS), and multigrid (MG). Greedy yields near-monotone decay and the lowest errors, whereas HINTS shows sawtooth behaviors. Convergence histories for 1D Poisson and 2D Helmholtz to \Cref{sec:moreexperimentalresults}}
+    \label{fig:errorcomparison}
+\end{figure}
+% \begin{figure}
+%     \resizebox{0.5\textwidth}{!}{\input{}}
+% \end{figure}
+As shown in \Cref{tab:errorcomparison}, across all solver families, the greedy router achieves the lowest final error and lowest mean AUC: Greedy-Jacobi, Greedy-GS, and Greedy-MG outperform both their single-solver and HINTS counterparts. While HINTS improves over single-solver schedules, it exhibits sawtooth error traces (See \Cref{fig:errorcomparison}) as HINTS often invokes the DeepONet when it is suboptimal. By contrast, the greedy routers only routes to solvers that yield an immediate error drop, which translates into the reported AUC gains and near-monotone error decay. Notably, the greedy solutions for 2D Helmholtz largely follow the corresponding classical solver alone. This indicates that the learned neural correction frequently fails to reduce the error and is therefore skipped by the greedy rule. HINTS, however, continues to call the neural operator at a fixed interval even when it increases the error, which explains its substantially worse AUC and final error on 2D Helmholtz.
+
+\paragraph{Size of solver ensembles:} We also study how the size of the solver ensemble affects final error and AUC. Each router is trained with an ensemble that always includes a DeepONet and a subset of weighted Jacobi solvers with relaxation parameters $\omega \in \{0.5, 0.67, 0.75, 0.8, 1\}$. We grow the solver set cumulatively, starting from the smallest $\omega$ and adding larger ones. In \Cref{tab:errorcomparison2}, the AUC decreases as the size of the solver set increases for both 1D Poisson and 1D Helmholtz (300 iterations), but with diminishing returns. 
+
+Additional experiments are provided in \Cref{sec:moreexperimentalresults}. 
+\begin{table}[]
+    \centering
+    \begin{tabular}{|c|c|c|c|c|}
+        \hline
+         Equation & \multicolumn{2}{|c|}{1D Poisson} & \multicolumn{2}{|c|}{1D Helmholtz}\\
+         \hline 
+        \# of Solvers & $\|e^{(T)}_h\|$ & AUC & $\|e^{(T)}_h\|$ & AUC \\
+         \hline
+        2 & 0.002 (0.001) & 1.717 (0.643)  & 0.018 (0.013) & 6.665 (3.81)  \\
+        3 & 0.002 (0.001) & 1.434 (0.554) & 0.017 (0.014) & 6.31 (3.852)\\
+        4 & 0.002 (0.001) & 1.337 (0.523) & 0.017 (0.014) & 6.182 (3.868)  \\
+        5 & 0.001 (0.001) & 1.293 (0.508) & 0.017 (0.014) & 6.113 (3.878) \\
+        6 & 0.001 (0.001) & 1.121 (0.449) & 0.017 (0.014) & 6.098 (3.88) \\
+         \hline
+    \end{tabular}
+
+    \caption{Final error and AUC of squared $L^2$ error for varying numbers of solvers. Values are mean ($\pm$ standard error (s.e.)) over 64 test instances; both mean and s.e. are reported in $\times 10^{-3}$.}
+    \label{tab:errorcomparison2}
+\end{table}
+\section{Discussion} \label{sec:discussion}
+
+We have introduced an adaptive method for selecting solvers that efficiently minimize the final error when solving a PDE iteratively. This opens several directions for future work. Our current DeepONet is trained in isolation, without accounting for its downstream role as a correction term predictor. Jointly training the ML solver and the router could yield larger gains. Another avenue is to employ reinforcement learning to learn a cost-aware routing strategy that optimizes the terminal error under compute budgets. 
+When the deployment conditions are unknown or volatile, our offline training procedure suffers and a fixed schedule like HINTS can perform better, however, framing routing as an online learning problem enables continual adaptation. Finally, it would be interesting to extend this routing scheme to broader optimization settings in which the router selects from a suite of optimizers at each iteration.
+
+
+\section*{Reproducibility Statement}
+
+The implementation of our hybrid PDE solver with learned greedy routing is provided in the source code submitted as supplemental materials. It includes scripts to reproduce all tables and figures in \Cref{sec:experiments} and \Cref{sec:moreexperimentalresults}, along with a README file that documents dependencies and commands for training routers and instructions for regenerating results. Data is generated on the fly using fixed seeds (specified in the code) to ensure exact reproducibility. Formal proofs of all theorems and propositions appear in \Cref{sec:proofgreedy,sec:proofapproxgreedy}.
+
+\bibliography{iclr2026_conference}
+\bibliographystyle{iclr2026_conference}
+
+\appendix
+\section{Background} \label{sec:appbackground}
+
+\subsection{Multigrid} \label{sec:multigrid}
+
+Let $A_h, A_{2h}$ represent the coefficient matrix on a fine grid with discretization parameter $h$ and $2h$, $u_h$ and $f_h$ represent the PDE solution and constant vector on a grid discretized by $h$, $R^{2h}_h$ denote the restriction matrix which transfers vectors from a fine grid to a coarse one, and $I^{h}_{2h}$ is the interpolation matrix transfers vectors from a coarse grid to a fine one. In a 2-grid method, a few iterations of the smoother (e.x. Jacobi or Gauss-Seidel) are first applied on the fine grid to approximate the solution of $A_hu_h = f_h$. The residual is then computed as $r_h = f_h - A_hu_h$ and restricted to the coarse grid via $r_{2h} = R^{2h}_hr_h$. The error equation, $A_{2h}e_{2h} = r_{2h}$, is solved on the coarse grid. The resulting estimate of the error is interpolated in the fine grid by $e_h = I^{h}_{2h}e_{2h}$, and the fine grid solution is updated by adding this correction, $u_h = u_h + e_h$. Finally, additional smoothing steps are performed on the fine grid to further reduce any high frequency errors. The preconditioning matrix for two-grid solver is $C_\mathrm{2G} = I^{h}_{2h}A_{2h}^{-1}R^{2h}_h$. More complex strategies for multigrid like V-cycle and W-cycle compute error corrections recursively across multiple grids of varying coarseness %(See \Cref{sec:multigrid} for pseudocode of these methods).
+
+\section{Proofs for \Cref{sec:greedy}} \label{sec:proofgreedy}
+
+\subsection{Proof of Proposition \ref{th:alpha=1}} \label{sec:proofalpha=1}
+
+\begin{proposition} \label{th:alpha=1}
+    Any prefix monotonically non-increasing sequence supermodular function $g$ is weakly supermodular with respect to all sequences $S \in \Omega^*$ with $\alpha(S) = 1$
+\end{proposition}
+
+\begin{proof}
+
+This proof is adapted from \citet{liberty2017greedy}.
+
+If $g$ is sequence supermodular then,
+\begin{align*}
+    &g(S) - g(S \ \oplus S' ) \\
+    &= \sum_{i = 1}^{|S'|} g(S \ \oplus \left(S'_1, \dots, S'_{i - 1}\right)) - g(S \ \oplus \left(S'_1, \dots, S'_{i}\right)) \\
+    &\overset{(a)}{\leq} \sum_{i = 1}^{|S'|} g(S) - g(S \ \oplus  S'_{i}) \\
+    &\leq |S'|\max_{i \in [|S'|]} g(S) - g(S \ \oplus  S'_{i})
+\end{align*}
+
+(a) by supermodularity
+
+
+\end{proof}
+
+\subsection{Proof of \Cref{th:suboptgreedy}} \label{sec:proofsuboptgreedy}
+
+
+
+\begin{customtheorem}{\ref{th:suboptgreedy}}
+    Let $g: \Omega^* \to \mathbb{R}$ be a weakly supermodular function with respect to the optimal solution $O = \argmin_{S \in \Omega^T} h(S)$ with a supermodularity ratio of $\alpha(O)$ and 
+    % weak-$\mu$-
+    postfix monotonicity. Let the greedy solution of length $T$ be $S^T$. If $\phi_T(\alpha) =  \left(1 - \frac{1}{\alpha T}\right)^T$, then
+    \begin{equation*}
+        g(S^T) \leq  \left(1 - \phi_T(\alpha(O))\right)
+        g(O) +  \phi_T(\alpha(O))g(\emptyset)
+    \end{equation*}
+    % Equivalently, 
+    % \begin{equation*}
+    %     \frac{g(\emptyset) - g(S^T)}{g(\emptyset) - g(O)} \geq \mu\left(1 - \left(1 - \frac{1}{\alpha T}\right)^T\right) \geq \mu\left(1 - \frac{1}{e^{\alpha}}\right)
+    % \end{equation*}
+\end{customtheorem}
+
+\begin{proof}
+
+This proof strategy is inspired by \citet{streeter2008online} and \citet{liberty2017greedy}
+
+\begin{align*}
+    g(S^t) -g(O) &\overset{(a)}{\leq} g(S^t) - g(S^t\ \oplus O) \\
+    % &= \left(1 - \frac{1}{\mu}\right)g(S^t) + \frac{1}{\mu}\left(g(S^t) - g(S^t\ \oplus O)\right) \\
+    &=\sum_{i = 1}^{|O|} g(S^t \oplus \left(o_1, \dots o_{i - 1}\right)) -g(S^t\ \oplus \left(o_1, \dots, o_{i}\right))\\
+    &\overset{(b)}{\leq}  \alpha(O)\sum_{i = 1}^{|O|} g(S^t) -g(S^t\ \oplus  o_{i}) \\
+    &\leq \alpha(O)|O|\max_{i \in [|O|]} g(S^t) -g(S^t\ \oplus  o_{i}) \\
+    &\leq \alpha(O) T g(S^t) -  \alpha(O) T\min_{\omega \in \Omega} g(S^t\ \oplus  \omega) \\
+    &= \alpha(O) Tg(S^t) -  \alpha(O) Tg(S^{t + 1})
+    % &= Tg(S^t) -  Tg(S^{t + 1}) \\
+    % &= T \left(g(S^t) - g(O)\right) - T\left(g(S^{t + 1}) -g(O)\right) \\
+    % g(S^{t + 1}) -g(O) &\leq \left(1 - \frac{1}{T}\right)\left(g(S^t) - g(O)\right)
+\end{align*}
+(a) by $\mu$- postfix monotonicity, (b) by supermodularity. 
+
+After rearranging the inequality, we get:
+
+\begin{align*}
+    g(S^{t + 1}) &\leq \frac{1}{\alpha(O) T}\left(g(O) -  \left(\alpha(O) T - 1\right)g(S^t)\right) \\
+    &= \frac{1}{\alpha(O) T}g(O) + \left(1 - \frac{1}{\alpha(O) T}\right)g(S^t)
+\end{align*}
+
+When recursively applying this inequality, we get:
+
+\begin{align*}
+     g(S^{T}) &\leq \frac{1}{\alpha(O) T}g(O)\sum_{i = 0}^{T - 1}\left(1 - \frac{1}{\alpha(O) T}\right)^i + \left(1 - \frac{1}{\alpha(O) T}\right)^Tg(\emptyset) \\
+     &= \left(1 - \left(1 - \frac{1}{\alpha(O) T}\right)^T\right)g(O) + \left(1 - \frac{1}{\alpha(O) T}\right)^Tg(\emptyset)
+\end{align*}
+
+% \begin{align*}
+%     g(S^t) -g(O) &\overset{(a)}{\leq} g(S^t) - \frac{1}{\mu}g(S^t\ \oplus O) \\
+%     &= \left(1 - \frac{1}{\mu}\right)g(S^t) + \frac{1}{\mu}\left(g(S^t) - g(S^t\ \oplus O)\right) \\
+%     &=\left(1 - \frac{1}{\mu}\right)g(S^t) + \frac{1}{\mu}\sum_{i = 1}^{|O|} g(S^t \oplus \left(o_1, \dots o_{i - 1}\right)) -g(S^t\ \oplus \left(o_1, \dots, o_{i}\right))\\
+%     &\overset{(b)}{\leq} \left(1 - \frac{1}{\mu}\right)g(S^t) + \frac{\alpha(O)}{\mu}\sum_{i = 1}^{|O|} g(S^t) -g(S^t\ \oplus  o_{i}) \\
+%     &\leq \left(1 - \frac{1}{\mu}\right)g(S^t) + \frac{\alpha(O)|O|}{\mu}\max_{i \in [|O|]} g(S^t) -g(S^t\ \oplus  o_{i}) \\
+%     &\leq  \left(1 - \frac{1 - \alpha(O) T}{\mu}\right)g(S^t) -  \frac{\alpha(O) T}{\mu}\min_{\omega \in \Omega} g(S^t\ \oplus  \omega) \\
+%     &=  \left(1 - \frac{1 - \alpha(O) T}{\mu}\right)g(S^t) -  \frac{\alpha(O) T}{\mu}g(S^{t + 1})
+%     % &= Tg(S^t) -  Tg(S^{t + 1}) \\
+%     % &= T \left(g(S^t) - g(O)\right) - T\left(g(S^{t + 1}) -g(O)\right) \\
+%     % g(S^{t + 1}) -g(O) &\leq \left(1 - \frac{1}{T}\right)\left(g(S^t) - g(O)\right)
+% \end{align*}
+% (a) by $\mu$- postfix monotonicity, (b) by supermodularity. 
+
+% After rearranging the inequality, we get:
+
+% \begin{align*}
+%     g(S^{t + 1}) &\leq \frac{\mu}{\alpha(O) T}\left(g(O) -  \frac{1 - \alpha(O) T}{\mu}g(S^t)\right) \\
+%     &= \frac{\mu}{\alpha(O) T}g(O) + \left(1 - \frac{1}{\alpha(O) T}\right)g(S^t)
+% \end{align*}
+
+% When recursively applying this inequality, we get:
+
+% \begin{align*}
+%      g(S^{T}) &\leq \frac{\mu}{\alpha(O) T}g(O)\sum_{i = 0}^{T - 1}\left(1 - \frac{1}{\alpha(O) T}\right)^i + \left(1 - \frac{1}{\alpha(O) T}\right)^Tg(\emptyset) \\
+%      &= \mu \left(1 - \left(1 - \frac{1}{\alpha(O) T}\right)^T\right)g(O) + \left(1 - \frac{1}{\alpha(O) T}\right)^Tg(\emptyset)
+% \end{align*}
+\end{proof}
+
+\subsection{Proof of Proposition \ref{th:weaklyalphasupermodular}} \label{sec:proofweaklyalphasupermodular}
+
+
+% \begin{customproposition}{\ref{th:weaklyalphasupermodular}}
+%     If $\|I_N - C_j\mathcal{L}_h^a\| \leq 1$ for all $j \in [K]$, $h$ is (i) prefix monotonically non-increasing and (ii) f is weakly-$\alpha$-supermodular with $$\alpha = \max_{S \in [K]^*: |S| = T}\frac{\left\|I_N - \prod_{t = T}^{1}\left(I_N - C_{S_t}\mathcal{L}_h^a\right)\right\|}{T\left(1 - \max_{t \in [T]}\|I_N - C_{S_t}\mathcal{L}_h^a\|\right) }$$Furthermore, if $I_N - C_j\mathcal{L}_h^a$ is invertible for all $j \in [K]$, $h$ is also postfix monotonically non-increasing.
+% \end{customproposition}
+
+\begin{customproposition}{\ref{th:weaklyalphasupermodular}}
+     Suppose that for all $j \in [K]$, the error propagation function $I - C_j \circ \mathcal{L}_h^a$ is $\rho_j$-Lipschitz continuous with $\rho_j < 1$, and that $(I - C_j \circ \mathcal{L}_h^a) (0_N) = 0_N$. Then, the function $h$ is weakly supermodular with respect to the optimal solution $O$, with $$\alpha(O) = \max\left\{\frac{4}{T - \sum_{i = 1}^{T} \rho_{O_i}^2} , 1\right\}  $$Furthermore, if $I - C_j \circ \mathcal{L}_h^a$ is invertible for all $j \in [K]$, $h$ is also postfix monotonically non-increasing.
+\end{customproposition}
+
+\begin{proof}
+For brevity, we use the notation $\left(g_1 \circ \dots \circ g_T\right)(x) = \circ_{t = 1}^{T} g_t(x)$, where composition is applied from right to left so that $g_T$ acts first. In this proof, we use a few properties of Lipschitz continuous functions:
+\begin{itemize}
+    \item \textbf{Property 1:} If $g$ is $\rho$-Lipschitz continuous and $g(0) = 0$, then $\|g(x)\|_2 = \|g(x) - 0\|_2 = \|g(x) - g(0)\|_2 \leq \rho \|x - 0\|_2 = \rho\|x\|_2$
+    \item \textbf{Property 2:} If $g_1$ and $g_2$ are Lipschitz continuous functions with Lipschitz constants of $\rho_1$ and $\rho_2$ respectively, the Lipschitz constant of $g_1 + g_2$ and $g_1 - g_2$ is $\rho_1 + \rho_2$.
+    \item \textbf{Property 3:} If $g_1$ and $g_2$ are Lipschitz continuous functions with Lipschitz constants of $\rho_1$ and $\rho_2$ respectively, the Lipschitz constant of $g_1 \circ g_2$ is $\rho_1\rho_2$.
+\end{itemize}
+
+In order to prove weakly-$\alpha$-supermodularity, we must first prove prefix monotonicity.
+
+\textbf{Prefix monotonicity: } Let $S \preceq S'$ where $S' = S \ \oplus N$.
+\begin{align*}
+    h(S') &= \left \|\circ_{t = |S'|}^1\left(I - C_{S'_t} \circ \mathcal{L}_h^a\right) \left(e^{(0)}_h\right)\right\|^2_2 \\
+    &= \left \|\circ_{t = |S'|}^{|S| + 1}\left(I - C_{S'_t}  \circ \mathcal{L}_h^a\right)\circ \circ_{t = |S|}^1\left(I - C_{S'_t}  \circ \mathcal{L}_h^a\right) \left(e^{(0)}_h\right)\right\|^2_2 \\
+    &\overset{(a)}{\leq}\left( \prod_{t = |S| + 1 }^{|S'|} \rho_{S'_t}^2 \right)\left\|\circ_{t = |S|}^1\left(I - C_{S_t} \circ \mathcal{L}_h^a\right) \left(e^{(0)}_h\right)\right\|^2_2 \\
+    &\leq h(S)
+\end{align*}
+(a) by Property 1
+
+
+\textbf{Weak supermodularity: } 
+% \paragraph{ } 
+We will upper bound $\alpha(O)$ by providing an upper bound for $ h(S) - h(S\ \oplus O) $ and a lower bound for $\sum_{i = 1}^T h(S) - h(S\ \oplus O_i) $. 
+\begin{align*}
+    h(S) - h(S\ \oplus O) &=  \left \|\circ_{t = |S|}^1\left(I - C_{S_t} \circ \mathcal{L}_h^a\right) \left(e^{(0)}_h\right)\right\|^2_2 -  \left \|\circ_{t = |O|}^{1}\left(I- C_{O_t} \circ\mathcal{L}_h^a\right) \circ \circ_{t = |S|}^1\left(I - C_{S_t} \circ \mathcal{L}_h^a\right)\left(e^{(0)}_h\right)\right\|^2_2 \\
+    &\overset{(a)}{\leq} \left \|\circ_{t = |S|}^1\left(I - C_{S_t} \circ \mathcal{L}_h^a\right) \left(e^{(0)}_h\right)-\circ_{t = |O|}^{1}\left(I - C_{O_t} \circ \mathcal{L}_h^a\right) \circ \circ_{t = |S|}^1\left(I - C_{S_t} \circ \mathcal{L}_h^a\right)\left(e^{(0)}_h\right)\right\|^2_2 \\
+    &=  \left \| \left(I -\circ_{t = |O|}^{1}\left(I - C_{O_t}\circ\mathcal{L}_h^a\right) \right)\circ  \circ_{t = |S|}^1\left(I - C_{S_t}\circ\mathcal{L}_h^a\right) \left(e^{(0)}_h\right)\right\|^2_2 \\
+    &\overset{(b)}{\leq}  \left(1 + \prod_{t = 1}^{|O|}\rho_{O_t}\right)^2\left\| \circ_{t = |S|}^1\left(I - C_{S_t} \circ \mathcal{L}_h^a\right) \left(e^{(0)}_h\right)\right\|^2_2 \\
+    &\overset{(c)}{\leq } 4 \left\| \circ_{t = |S|}^1\left(I - C_{S_t} \circ \mathcal{L}_h^a\right) \left(e^{(0)}_h\right)\right\|^2_2
+\end{align*}
+% \begin{align*}
+%     h(S) - h(S\ \oplus S') &=  \left \|\circ_{t = |S|}^1\left(I - C_{S_t} \circ \mathcal{L}_h^a\right) \left(e^{(0)}_h\right)\right\|^2_2 -  \left \|\circ_{t = |S'|}^{1}\left(I- C_{S'_t} \circ\mathcal{L}_h^a\right) \circ \circ_{t = |S|}^1\left(I - C_{S_t} \circ \mathcal{L}_h^a\right)\left(e^{(0)}_h\right)\right\|^2_2 \\
+%     &\overset{(a)}{\leq} \left \|\circ_{t = |S|}^1\left(I - C_{S_t} \circ \mathcal{L}_h^a\right) \left(e^{(0)}_h\right)-\circ_{t = |S'|}^{1}\left(I - C_{S'_t} \circ \mathcal{L}_h^a\right) \circ \circ_{t = |S|}^1\left(I - C_{S_t} \circ \mathcal{L}_h^a\right)\left(e^{(0)}_h\right)\right\|^2_2 \\
+%     &=  \left \| \left(I -\circ_{t = |S'|}^{1}\left(I - C_{S'_t}\circ\mathcal{L}_h^a\right) \right)\circ  \circ_{t = |S|}^1\left(I - C_{S_t}\circ\mathcal{L}_h^a\right) \left(e^{(0)}_h\right)\right\|^2_2 \\
+%     &\overset{(b)}{\leq}  \left(1 + \prod_{t = 1}^{|S'|}\rho_{S'_t}\right)^2\left\| \circ_{t = |S|}^1\left(I - C_{S_t} \circ \mathcal{L}_h^a\right) \left(e^{(0)}_h\right)\right\|^2_2 \\
+%     &\overset{(c)}{\leq } 4 \left\| \circ_{t = |S|}^1\left(I - C_{S_t} \circ \mathcal{L}_h^a\right) \left(e^{(0)}_h\right)\right\|^2_2
+% \end{align*}
+
+(a) by reverse triangle property and $h(S) - h(S\ \oplus S') > 0$ by prefix monotonicity, (b) since the Lipschitz constant of $I -\circ_{t = |S'|}^{1}\left(I - C_{S'_t}\circ\mathcal{L}_h^a\right)$ is $1 + \prod_{t = 1}^{|S'|}\rho_{S'_t}$ by Property 2 and 3, (c) since $\rho_j < 1$
+
+
+To lower bound $\sum_{i = 1}^{|O|} h(S) - h(S\ \oplus O_i) $
+\begin{align*}
+    \sum_{i = 1}^{|O|} h(S) - h(S\ \oplus O_i) &= \sum_{i = 1}^{|O|} \left \|\circ_{t = |S|}^1\left(I - C_{S_t} \circ \mathcal{L}_h^a\right) \left(e^{(0)}_h\right)\right\|^2_2 - \left \|\left(I - C_{O_i} \circ \mathcal{L}_h^a\right) \circ \circ_{t = |S|}^1\left(I - C_{S_t} \circ\mathcal{L}_h^a\right) \left(e^{(0)}_h\right)\right\|^2_2  \\
+    &\geq \sum_{i = 1}^{|O|} \left \|\circ_{t = |S|}^1\left(I - C_{S_t} \circ\mathcal{L}_h^a\right) \left(e^{(0)}_h\right)\right\|^2_2 - \rho_{O_i}^2\left\|\circ_{t = |S|}^1\left(I - C_{S_t}\circ\mathcal{L}_h^a\right) \left(e^{(0)}_h\right)\right\|^2_2 \\
+    &= \left \|\circ_{t = |S|}^1\left(I_N - C_{S_t}\circ\mathcal{L}_h^a\right) \left(e^{(0)}_h\right)\right\|^2_2 \left(T - \sum_{i = 1}^{T} \rho_{O_i}^2\right) 
+\end{align*}
+% \begin{align*}
+%     \max_i h(S) - h(S\ \oplus S'_i) &= \left \|\circ_{t = |S|}^1\left(I - C_{S_t} \circ \mathcal{L}_h^a\right) \left(e^{(0)}_h\right)\right\|^2_2 - \min_i \left \|\left(I - C_{S_i'} \circ \mathcal{L}_h^a\right) \circ \circ_{t = |S|}^1\left(I - C_{S_t} \circ\mathcal{L}_h^a\right) \left(e^{(0)}_h\right)\right\|^2_2  \\
+%     &\geq \left \|\circ_{t = |S|}^1\left(I - C_{S_t} \circ\mathcal{L}_h^a\right) \left(e^{(0)}_h\right)\right\|^2_2 - \min_i \rho_{S_i'}^2\left\|\circ_{t = |S|}^1\left(I - C_{S_t}\circ\mathcal{L}_h^a\right) \left(e^{(0)}_h\right)\right\|^2_2 \\
+%     &= \left(1 - \min_i \rho_{S_i'}^2\right) \left \|\circ_{t = |S|}^1\left(I_N - C_{S_t}\circ\mathcal{L}_h^a\right) \left(e^{(0)}_h\right)\right\|^2_2 
+% \end{align*}
+
+Finally,
+
+\begin{align*}
+    \frac{h(S) - h(S\ \oplus O)}{T\max_i h(S) - h(S\ \oplus O_i)} &\leq \max\left\{ \frac{4\left\| \circ_{t = |S|}^1\left(I - C_{S_t} \circ \mathcal{L}_h^a\right) \left(e^{(0)}_h\right)\right\|^2_2}{\left \|\circ_{t = |S|}^1\left(I_N - C_{S_t}\circ\mathcal{L}_h^a\right) \left(e^{(0)}_h\right)\right\|^2_2 \left(T - \sum_{i = 1}^{T} \rho_{O_i}^2\right) }, 1\right\}\\
+    &= \max\left\{\frac{4}{T - \sum_{i = 1}^{T} \rho_{O_i}^2} , 1\right\} 
+\end{align*}
+
+\textbf{Postfix monotonicity: } Let $S' = S \ \oplus N$. 
+
+% Consider a function $\tilde{h}^{-1}(z)$ for $z \in \mathbb{R}^N$ be a function such that $\tilde{h}^{-1}(h(N)) = $
+
+%Let $b$ a function such that $b \ \circ  \circ_{t = |N|}^{1}\left(I - C_{N_t}\circ\mathcal{L}_h\right) e^{(0)} = e^{(0)}$
+
+\begin{align*}
+    h(S') &= \left \|\circ_{t = |S'|}^1\left(I - C_{S'_t}\circ\mathcal{L}_h\right) e^{(0)}_h\right\|^2_2 \\
+    &= \left \|\circ_{t = |N|}^{1}\left(I - C_{N_t}\circ \mathcal{L}_h\right)\circ \circ_{t = |S|}^1\left(I - C_{S_t}\circ \mathcal{L}_h\right) e^{(0)}_h\right\|^2_2 \\
+    &\overset{(a)}{=}  \left \|\circ_{t = |N|}^{1}\left(I - C_{N_t} \circ \mathcal{L}_h\right)\circ \circ_{t = |S|}^1\left(I - C_{S_t}\circ\mathcal{L}_h\right)\circ\left(\circ_{t = |N|}^{1}\left(I - C_{N_t}\circ\mathcal{L}_h\right)\right)^{-1}\circ \circ_{t = |N|}^{1}\left(I - C_{N_t}\circ\mathcal{L}_h\right) e^{(0)}_h\right\|^2_2 \\
+    &\leq \prod_{t = 1}^{|N|} \rho^2_{N_t} \prod_{t = 1}^{|S|} \rho^2_{S_t} \prod_{t = 1}^{|N|} \rho^{-2}_{N_t}  \left\|\circ_{t = |N|}^{1}\left(I - C_{N_t}\circ\mathcal{L}_h\right) e^{(0)}_h\right\|^2_2 \\
+    % &\leq \left \|\prod_{t = |N|}^{1}\left(I_N - C_{N_t}\mathcal{L}_h\right)\right\|^2_2\left \|\prod_{t = |S|}^1\left(I_N - C_{S_t}\mathcal{L}_h\right)\right\|^2_2\left \|\prod_{t = |N|}^{1}\left(I_N - C_{N_t}\mathcal{L}_h\right)\right\|^{-2}_2\left \| \prod_{t = |N|}^{1}\left(I_N - C_{N_t}\mathcal{L}_h\right)e^{(0)}\right\|^2_2 \\
+    % &\leq \circ_{t = |S|}^{1}\left \|\left(I - C_{S_t}\circ\mathcal{L}_h\right) \right\|^2_2 \left\|\circ_{t = |N|}^1\left(I - C_{N_t}\circ\mathcal{L}_h\right) e^{(0)}\right\|^2_2 \\
+    &\leq h(N)
+\end{align*}
+
+% \begin{align*}
+%     h(S') &= \left \|\circ_{t = |S'|}^1\left(I - C_{S'_t}\circ\mathcal{L}_h\right) e^{(0)}_h\right\|^2_2 \\
+%     &= \left \|\circ_{t = |N|}^{1}\left(I - C_{N_t}\circ \mathcal{L}_h\right)\circ \circ_{t = |S|}^1\left(I - C_{S_t}\circ \mathcal{L}_h\right) e^{(0)}_h\right\|^2_2 \\
+%     &\overset{(a)}{=}  \left \|\circ_{t = |N|}^{1}\left(I - C_{N_t} \circ \mathcal{L}_h\right)\circ \circ_{t = |S|}^1\left(I - C_{S_t}\circ\mathcal{L}_h\right)\circ\left(\circ_{t = |N|}^{1}\left(I - C_{N_t}\circ\mathcal{L}_h\right)\right)^{-1}\circ \circ_{t = |N|}^{1}\left(I - C_{N_t}\circ\mathcal{L}_h\right) e^{(0)}\right\|^2_2 \\
+%     &\leq \prod_{t = 1}^{|N|} \rho^2_{N_t} \prod_{t = 1}^{|S|} \rho^2_{S_t} \rho^2(g)  \left\|\circ_{t = |N|}^{1}\left(I - C_{N_t}\circ\mathcal{L}_h\right) e^{(0)}\right\|^2_2 \\
+%     % &\leq \left \|\prod_{t = |N|}^{1}\left(I_N - C_{N_t}\mathcal{L}_h\right)\right\|^2_2\left \|\prod_{t = |S|}^1\left(I_N - C_{S_t}\mathcal{L}_h\right)\right\|^2_2\left \|\prod_{t = |N|}^{1}\left(I_N - C_{N_t}\mathcal{L}_h\right)\right\|^{-2}_2\left \| \prod_{t = |N|}^{1}\left(I_N - C_{N_t}\mathcal{L}_h\right)e^{(0)}\right\|^2_2 \\
+%     % &\leq \circ_{t = |S|}^{1}\left \|\left(I - C_{S_t}\circ\mathcal{L}_h\right) \right\|^2_2 \left\|\circ_{t = |N|}^1\left(I - C_{N_t}\circ\mathcal{L}_h\right) e^{(0)}\right\|^2_2 \\
+%     &\leq h(N)
+% \end{align*}
+
+(a) due the invertibility of $I_N - C_j\mathcal{L}_h$
+
+\end{proof}
+
+\subsection{Proof of \Cref{th:simultaneousallocation}} \label{sec:proofsimultaneousallocation}
+
+\begin{lemma} \label{th:simultaneousallocation}
+     Let $\left(I - C_j \mathcal{L}_{h}^a\right) = P\Lambda_jP^{-1}$ where $P$ is an orthogonal matrix and $\Lambda_j = \mathrm{diag}(\lambda_{j1}, \dots, \lambda_{jN})$. If $P^{-1}e^{(0)}_h = z$, then the following equality holds:
+     \begin{equation} \label{eq:simultaneous}
+          h(S) = \sum_{i = 1}^N z_i^2 \prod_{j = 1}^K \lambda_{ji}^{2m_j(S)}
+          % \qquad\mathrm{s.t}\qquad \sum_{k=1}^{K} m_k = T 
+     \end{equation}
+     where $m_j(S) = \sum_{t= 1}^{|S|}\1_{S_t = j}$
+\end{lemma}
+
+\begin{proof}
+
+\begin{align*}
+    h(S) &= \left\|\prod_{t = |S|}^1\left(I_N - C_{S_t} \mathcal{L}_{h}^a\right)  e^{(0)}_h \right\|^2 \\
+    &=  \left\|\prod_{t = |S|}^1\left(P\Lambda_{S_t}P^{-1}\right)  e^{(0)}_h \right\|^2 \\
+    &=  \left\|P\prod_{t = |S|}^1\Lambda_{S_t}P^{-1}  e^{(0)}_h \right\|^2 \\
+    &= \left\|\prod_{t = |S|}^1\Lambda_{S_t}P^{-1}  e^{(0)}_h \right\|^2\\
+    &=  \sum_{i = 1}^N z_i^2 \prod_{t = T}^1 \lambda_{S_ti}^2 \\
+    &=  \sum_{i = 1}^N z_i^2 \prod_{j = 1}^K \lambda_{ji}^{2m_j(S)} 
+    % &= \min_{\mathbf{m} \in\mathbb{N}^{K}}\quad \sum_{j = 1}^N z_i^2 \exp \left\{\sum_{k = 1}^K m_k \log \lambda_{kj}^{2}\right\}
+    % \qquad\mathrm{s.t}\qquad \sum_{k=1}^{K} m_k = T
+\end{align*}
+
+\end{proof}
+
+\subsection{Proof of \Cref{th:simultaneoussupermodular}} \label{sec:proofsimultaneoussupermodular}
+\begin{customproposition}{\ref{th:simultaneoussupermodular}}
+    Let $\|I_N - C_j\mathcal{L}_h^a\| \leq 1$ for all $j \in [K]$ and $\left(I - C_j \mathcal{L}_{h}^a\right) = P\Lambda_jP^{-1}$. Then, $h$ is supermodular. 
+\end{customproposition}
+
+\begin{proof}
+
+Let $S \preceq S'$ where $S' = S \ \oplus B$. By \Cref{th:simultaneousallocation},
+\begin{align*}
+    h(S) &= \sum_{i = 1}^N z_i^2 \prod_{j = 1}^K \lambda_{ji}^{2m_j(S)} 
+\end{align*}
+where $m_j(S) = \sum_{t = 1}^{|S|} \1_{S_t = j}$ be the number of times a sequence $S$ calls the solver $j$. Recall that $h$ is considered sequence supermodular if $\forall S', S \in \Omega^*$ such that $S \preceq S'$, it holds that
+\begin{align*}
+    h(S) - h(S \ \oplus \omega ) \geq h(S') - h(S' \ \oplus \omega )
+\end{align*}
+% Without loss of generality, let's assume that $\omega$ that will be appended to $S, S'$ is $1$.
+\begin{align*}
+    h(S) - h(S \ \oplus \omega) &= \sum_{i = 1}^N z_i^2 \prod_{j = 1}^K \lambda_{ji}^{2m_j(S)} - \sum_{i = 1}^N z_i^2 \lambda_{\omega i}^{2}\prod_{k = 1}^K \lambda_{ji}^{2m_j(S)} \\
+    &=  \sum_{i = 1}^N \left(1 - \lambda_{\omega i}^2\right) z_i^2 \prod_{j = 1}^K \lambda_{ji}^{2m_j(S)}
+\end{align*}
+Similarly, 
+\begin{align*}
+    h(S') - h(S \ \oplus \omega) &= \sum_{i = 1}^N \left(1 - \lambda_{\omega i}^2\right) z_i^2 \prod_{j = 1}^K \lambda_{ji}^{2m_j(S')} \\
+    &\overset{(a)}{=}  \sum_{i = 1}^N \left(1 - \lambda_{\omega i}^2\right) z_i^2 \prod_{j = 1}^K \lambda_{ji}^{2\left(m_j(S) + m_j(B)\right)} \\
+    &\overset{(b)}{\leq } \sum_{i = 1}^N \left(1 - \lambda_{\omega i}^2\right) z_i^2 \prod_{j = 1}^K \lambda_{ji}^{2m_j(S)} \\
+    &= h(S) - h(S \ \oplus \omega)
+\end{align*}
+
+
+(a) Since $m_j(S') = \sum_{t = 1}^{|S'|} \1_{S_t' = j} = \sum_{t = 1}^{|S|} \1_{S_t' = j} + \sum_{t = |S|}^{|S'|} \1_{S_t' = j} = \sum_{t = 1}^{|S|} \1_{S_t = k} + \sum_{t = 1}^{|B|} 1_{B_t = j} = m_j(S) + m_j(B)$, (b) since $\rho(I_N - C_j \mathcal{L}_h^a) < 1$ and $m_j(B) \geq 0$ for all $j \in [K]$
+
+\end{proof}
+
+
+\section{Proofs for \Cref{sec:approxgreedy}} \label{sec:proofapproxgreedy}
+
+\subsection{Proof of \Cref{th:routingequivalence}} \label{sec:proofroutingequivalence}
+
+\begin{lemma} \label{th:routingequivalence}
+
+For any set of preconditioning functions $\mathcal{C}$, any discrete operator $\mathcal{L}_h^a$, any router $r$, any $a_h, f_h, u_h^{(t)}, u_h \in \mathcal{A} \times \mathcal{F} \times \mathcal{U} \times \mathcal{U}$, the following equality holds true:
+\begin{align*}
+     l_{\text{route}}\left(r, a_h, f_h, u^{(t)}_h, u_h\right) = &\sum_{j = 1}^K \sum_{k = 1}^K\left\|\left( I - C_{k} \circ \mathcal{L}_{h}^a\right)\left(u_h - u^{(t)}_h\right)\right\|^2_2\1_{k\neq j}\1_{r(a_h, f_h, u^{(t)}_h) \neq j} \\
+     &-\left(K - 2\right)\sum_{j = 1}^K\left\|\left( I - C_{j} \circ \mathcal{L}_{h}^a\right)\left(u_h - u^{(t)}_h\right)\right\|^2_2
+\end{align*}
+    
+\end{lemma}
+
+\begin{proof}
+Note that $\sum_{j = 1}^K \1_{r(a_h, f_h, u^{(t)}_h) \neq j}= K - 1$
+\begin{align*}
+    l_{\text{route}}\left(r, a_h, f_h, u^{(t)}_h, u_h\right) &= \sum_{j = 1}^K \left\|\left( I - C_{j} \circ \mathcal{L}_{h}^a\right)\left(u_h - u^{(t)}_h\right)\right\|^2_2\1_{r(a_h, f_h, u^{(t)}_h) = j} \\
+    &= \sum_{j = 1}^K \left\|\left( I - C_{j} \circ \mathcal{L}_{h}^a\right)\left(u_h - u^{(t)}_h\right)\right\|^2_2 - \sum_{j = 1}^K \left\|\left( I - C_{j} \circ \mathcal{L}_{h}^a\right)\left(u_h - u^{(t)}_h\right)\right\|^2_2\1_{r(a_h, f_h, u^{(t)}_h) \neq j} \\
+    &= \sum_{j = 1}^K \left\|\left( I - C_{j} \circ \mathcal{L}_{h}^a\right)\left(u_h - u^{(t)}_h\right)\right\|^2_2 - \sum_{j = 1}^K \left\|\left( I - C_{j} \circ \mathcal{L}_{h}^a\right)\left(u_h - u^{(t)}_h\right)\right\|^2_2\1_{r(a_h, f_h, u^{(t)}_h) \neq j} \\
+    &+ \left(K - 1\right)\sum_{k = 1}^K\left\|\left( I - C_{k} \circ \mathcal{L}_{h}^a\right)\left(u_h - u^{(t)}_h\right)\right\|^2_2 - \left(K - 1\right)\sum_{k = 1}^K\left\|\left( I - C_{k} \circ \mathcal{L}_{h}^a\right)\left(u_h - u^{(t)}_h\right)\right\|^2_2 \\
+    &= \sum_{j = 1}^K \left\|\left( I - C_{j} \circ \mathcal{L}_{h}^a\right)\left(u_h - u^{(t)}_h\right)\right\|^2_2 - \sum_{j = 1}^K \left\|\left( I - C_{j} \circ \mathcal{L}_{h}^a\right)\left(u_h - u^{(t)}_h\right)\right\|^2_2\1_{r(a_h, f_h, u^{(t)}_h) \neq j} \\
+    &+ \sum_{j = 1}^K\1_{r(a_h, f_h, u^{(t)}_h) \neq j}\sum_{k = 1}^K\left\|\left( I - C_{k} \circ \mathcal{L}_{h}^a\right)\left(u_h - u^{(t)}_h\right)\right\|^2_2 \\
+    &- \left(K - 1\right)\sum_{k = 1}^K\left\|\left( I - C_{k} \circ \mathcal{L}_{h}^a\right)\left(u_h - u^{(t)}_h\right)\right\|^2_2 \\
+    &= \sum_{j = 1}^K\left(\sum_{k = 1}^K\left\|\left( I - C_{k} \circ \mathcal{L}_{h}^a\right)\left(u_h - u^{(t)}_h\right)\right\|^2_2  - \left\|\left( I - C_{j} \circ \mathcal{L}_{h}^a\right)\left(u_h - u^{(t)}_h\right)\right\|^2_2\right)\1_{r(a_h, f_h, u^{(t)}_h) \neq j} \\
+    &- \left(K - 2\right)\sum_{k = 1}^K\left\|\left( I - C_{k} \circ \mathcal{L}_{h}^a\right)\left(u_h - u^{(t)}_h\right)\right\|^2_2 \\
+    &=\sum_{j = 1}^K\sum_{k = 1}^K\left\|\left( I - C_{k} \circ \mathcal{L}_{h}^a\right)\left(u_h - u^{(t)}_h\right)\right\|^2_2\1_{k\neq j}\1_{r(a_h, f_h, u^{(t)}_h) \neq j} \\
+    &- \left(K - 2\right)\sum_{k = 1}^K\left\|\left( I - C_{k} \circ \mathcal{L}_{h}^a\right)\left(u_h - u^{(t)}_h\right)\right\|^2_2
+ \end{align*}
+\end{proof}
+
+
+\subsection{Proof of \Cref{th:upperbound}} \label{sec:proofupperbound}
+
+\begin{proposition} \label{th:upperbound}
+    For any router $r$ defined by $r(a, f, u^{(t)}) = \text{argmax}_{j \in [K]} g_j(a, f, u^{(t)})$, any $a_h \in \mathcal{A}$, $f_h \in \mathcal{F}$, and $u_h^{(t)}, u_h \in \mathcal{U}$, the routing loss $l_{\text{route}}$ satisfies:
+    $$\log(2)l_{\text{route}}\left(r, a_h, f_h, u^{(t)}_h, u_h\right)\leq \Psi(\mathbf{g}, a_h, f_h, u_h^{(t)}, u_h) $$
+\end{proposition}
+
+
+\begin{proof}
+
+By \Cref{th:routingequivalence}, we know that
+
+\begin{align*}
+    \log(2)l_{\text{route}}\left(r, a_h, f_h, u^{(t)}_h, u_h\right) = &\log(2)\sum_{j = 1}^K \sum_{k = 1}^K\left\|\left( I - C_{k} \circ \mathcal{L}_{h}^a\right)\left(u_h - u^{(t)}_h\right)\right\|^2_2\1_{k\neq j}\1_{r(a_h, f_h, u^{(t)}_h) \neq j} \\
+     &-\log(2)\left(K - 2\right)\sum_{j = 1}^K\left\|\left( I - C_{j} \circ \mathcal{L}_{h}^a\right)\left(u_h - u^{(t)}_h\right)\right\|^2_2 \\
+     &\leq \log(2)\sum_{j = 1}^K \sum_{k = 1}^K\left\|\left( I - C_{k} \circ \mathcal{L}_{h}^a\right)\left(u_h - u^{(t)}_h\right)\right\|^2_2\1_{k\neq j}\1_{r(a_h, f_h, u^{(t)}_h) \neq j} \\
+     &\overset{(a)}{\leq} -\sum_{j = 1}^K \sum_{k = 1}^K\left\|\left( I - C_{k} \circ \mathcal{L}_{h}^a\right)\left(u_h - u^{(t)}_h\right)\right\|^2_2\1_{k\neq j}\log\left(\frac{\exp\left(g_j(a, f, u^{(t)})\right)}{\sum_{k = 1}^K\exp\left(g_k(a, f, u^{(t)})\right)}\right) \\
+     &= \Psi(\mathbf{g}, a_h, f_h, u_h^{(t)}, u_h)
+\end{align*}
+(a) if $r(a_h, f_h, u^{(t)}_h) \neq j$, $\frac{\exp\left(g_j(a, f, u^{(t)})\right)}{\sum_{k = 1}^K\exp\left(g_k(a, f, u^{(t)})\right)} < 0.5$ which implies that $-\log\left(\frac{\exp\left(g_j(a, f, u^{(t)})\right)}{\sum_{k = 1}^K\exp\left(g_k(a, f, u^{(t)})\right)}\right)  \geq \log(2)\1_{r(a_h, f_h, u^{(t)}_h) \neq j}$
+
+\end{proof}
+
+
+\subsection{Proof of \Cref{th:consistency}} \label{sec:proofconsistency}
+
+\begin{customtheorem}{\ref{th:consistency}}
+    Let $\Tilde{c}_j(a_h, u^{(t)}_h, u_h) < \Bar{E} < \infty$  for all $j \in [K]$. If there exists $j\in [K]$ such that $\Tilde{c}_j(a_h, u^{(t)}_h, u_h) > E_{min} > 0$, then, for any collection of solvers $\{C_j\}_{j= 1}^K$ and linear discrete operator $\mathcal{L}_h^a$, $\Psi$ is Bayes consistent surrogate for $l_{\text{route}}$.
+\end{customtheorem}
+
+\begin{proof}
+
+For a given $a_h, f_h$, let $u_h$ be $\mathcal{G}_h\left(a_h, f_h\right)$ where $\mathcal{G}_h$ denotes the solution operator acting on the grid $G_h$. Furthermore, let's consider routers of the form $$r(a, f, u^{(t)}) = \text{argmax}_{j \in [K]} g_j(a, f, u^{(t)})$$
+
+For a given $a_h, f_h, u_h^{(t)} \in \mathcal{A} \times \mathcal{F} \times \mathcal{U}$, let the optimal loss under $l_{\text{route}}$ be $l_{\text{route}}^*\left(a_h, f_h, u^{(t)}_h\right) = \inf_{\Tilde{r}} l_{\text{route}}\left(\tilde{r}, a_h, f_h, u^{(t)}_h, \mathcal{G}_h\left(a_h, f_h\right)\right)$. Similarly, let the optimal loss under $\Psi$ be $\Psi^*\left(a_h, f_h, u^{(t)}_h\right) = \inf_{\Tilde{\mathbf{g}}} \Psi\left(\tilde{\mathbf{g}}, a_h, f_h, u^{(t)}_h, \mathcal{G}_h\left(a_h, f_h\right)\right)$. Let $B_j(a_h, f_h, u^{(t)}_h) = \sum_{k = 1}^K\left\|\left( I - C_{k} \circ \mathcal{L}_{h}^a\right)\left(\mathcal{G}_h\left(a_h, f_h\right) - u^{(t)}_h\right)\right\|^2_2\1_{k\neq j}$.
+
+\begin{align*}
+    &l_{\text{route}}\left(r, a_h, f_h, u^{(t)}_h, \mathcal{G}_h\left(a_h, f_h\right)\right) - l_{\text{route}}^*\left(a_h, f_h, u^{(t)}_h\right) \\
+    &\overset{(a)}{=} \sum_{j = 1}^K\sum_{k = 1}^K\left\|\left( I - C_{k} \circ \mathcal{L}_{h}^a\right)\left(u_h - u^{(t)}_h\right)\right\|^2_2\1_{k\neq j}\1_{r(a_h, f_h, u^{(t)}_h) \neq j}  -\left(K - 2\right)\sum_{j = 1}^K\left\|\left( I - C_{j} \circ \mathcal{L}_{h}^a\right)\left(u_h - u^{(t)}_h\right)\right\|^2_2 \\
+    &\quad- \inf_{\Tilde{r}} \sum_{j = 1}^K\sum_{k = 1}^K\left\|\left( I - C_{k} \circ \mathcal{L}_{h}^a\right)\left(u_h - u^{(t)}_h\right)\right\|^2_2\1_{k\neq j}\1_{\tilde{r}(a_h, f_h, u^{(t)}_h) \neq j}  +\left(K - 2\right)\sum_{j = 1}^K\left\|\left( I - C_{j} \circ \mathcal{L}_{h}^a\right)\left(u_h - u^{(t)}_h\right)\right\|^2_2 \\
+    &= \sum_{j = 1}^K B_j(a_h, f_h, u^{(t)}_h)\1_{r(a_h, f_h, u^{(t)}_h) \neq j} - \inf_{\Tilde{r}} \sum_{j = 1}^KB_j(a_h, f_h, u^{(t)}_h)\1_{\tilde{r}(a_h, f_h, u^{(t)}_h) \neq j}  \\
+    &= \sum_{k = 1}^K B_k(a_h, f_h, u^{(t)}_h)\left(\sum_{j = 1}^K \frac{B_j(a_h, f_h, u^{(t)}_h)}{\sum_{k = 1}^K B_k(a_h, f_h, u^{(t)}_h)}\1_{r(a_h, f_h, u^{(t)}_h) \neq j} - \inf_{\Tilde{r}} \sum_{j = 1}^K \frac{B_j(a_h, f_h, u^{(t)}_h)}{ \sum_{k = 1}^K B_k(a_h, f_h, u^{(t)}_h)}\1_{\tilde{r}(a_h, f_h, u^{(t)}_h) \neq j}\right)
+\end{align*}
+(a) by \Cref{th:routingequivalence}
+
+Let $\mathcal{X} = \mathcal{A} \times \mathcal{F} \times \mathcal{U}$ and $\mathcal{Y} = [K]$. Let $\mathcal{P}_{\mathcal{X}}$ denote the degenerate distribution suported at the point $(a_h, f_h, u_h^{(t)})$. We define the conditional distribtion - $P(Y = j \mid X = (a_h, f_h, u_h^{(t)})) = \frac{B_j(a_h, f_h, u^{(t)}_h)}{ \sum_{k = 1}^K B_k(a_h, f_h, u^{(t)}_h)}$ for $j \in [K]$. The risk and optimal risk of $0-1$ loss under this distribution can be written as:
+\begin{align*}
+    \mathcal{R}_{0-1}(r) &= \sum_{j = 1}^K \frac{B_j(a_h, f_h, u^{(t)}_h)}{\sum_{k = 1}^K B_k(a_h, f_h, u^{(t)}_h)}\1_{r(a_h, f_h, u^{(t)}_h) \neq j} \\
+    \mathcal{R}_{0-1}^* &= \inf_r \sum_{j = 1}^K \frac{B_j(a_h, f_h, u^{(t)}_h)}{\sum_{k = 1}^K B_k(a_h, f_h, u^{(t)}_h)}\1_{r(a_h, f_h, u^{(t)}_h) \neq j} 
+    % \mathcal{R}_{ce}(r) &= \sum_{j = 1}^K \frac{B_j(a_h, f_h, u^{(t)}_h)}{\sum_{k = 1}^K B_k(a_h, f_h, u^{(t)}_h)}\1_{f(a_h, f_h, u^{(t)}_h) \neq j} \\
+    % \mathcal{R}_{ce}^* &= \inf_f \sum_{j = 1}^K \frac{B_j(a_h, f_h, u^{(t)}_h)}{\sum_{k = 1}^K B_k(a_h, f_h, u^{(t)}_h)}\1_{f(a_h, f_h, u^{(t)}_h) \neq j}
+\end{align*}
+
+If $r(a_h, f_h, u^{(t)}_h) = \argmax_{j \in [k]} g_j(a_h, f_h, u^{(t)}_h)$ for all $x \in \mathcal{X}$, then the he risk and optimal risk of cross entropy loss ($l_{ce}(\mathbf{g}, x, y)-\log\left(\frac{\exp\left(g_y(x)\right)}{\sum_{k = 1}^K\exp\left(g_k(x)\right)}\right)$) under this distribution can be written as:
+
+\begin{align*}
+    \mathcal{R}_{ce}(\mathbf{g}) &= -\sum_{j = 1}^K \frac{B_j(a_h, f_h, u^{(t)}_h)}{\sum_{k = 1}^K B_k(a_h, f_h, u^{(t)}_h)}\log\left(\frac{\exp\left(g_j(a_h, f_h, u^{(t)}_h)\right)}{\sum_{k = 1}^K\exp\left(g_k(a_h, f_h, u^{(t)}_h)\right)}\right) \\
+    \mathcal{R}_{ce}^* &= \inf_{\mathbf{g}} -\sum_{j = 1}^K \frac{B_j(a_h, f_h, u^{(t)}_h)}{\sum_{k = 1}^K B_k(a_h, f_h, u^{(t)}_h)}\log\left(\frac{\exp\left(g_j(a_h, f_h, u^{(t)}_h)\right)}{\sum_{k = 1}^K\exp\left(g_k(a_h, f_h, u^{(t)}_h)\right)}\right) 
+\end{align*}
+
+From Theorem 3.1 of \citep{mao2023cross}, $\mathcal{R}_{0-1}(r) - \mathcal{R}_{0-1}^* \leq \Gamma^{-1}\left(\mathcal{R}_{ce}(\mathbf{g}) - \mathcal{R}_{ce}^*\right)$ if $r(a_h, f_h, u^{(t)}_h) = \argmax_{j \in [k]} g_j(a_h, f_h, u^{(t)}_h)$ where $\Gamma(z) = \frac{1 + z}{2}\log(1 + z) + \frac{1 - z}{2}\log(1 - z)$. Then,
+
+\begin{align*}
+    &l_{\text{route}}\left(r, a_h, f_h, u^{(t)}_h, \mathcal{G}_h\left(a_h, f_h\right)\right) - l_{\text{route}}^*\left(a_h, f_h, u^{(t)}_h\right) \\
+    &= \sum_{k = 1}^K B_k(a_h, f_h, u^{(t)}_h)\left(\sum_{j = 1}^K \frac{B_j(a_h, f_h, u^{(t)}_h)}{\sum_{k = 1}^K B_k(a_h, f_h, u^{(t)}_h)}\1_{r(a_h, f_h, u^{(t)}_h) \neq j} - \inf_{\Tilde{r}} \sum_{j = 1}^K \frac{B_j(a_h, f_h, u^{(t)}_h)}{ \sum_{k = 1}^K B_k(a_h, f_h, u^{(t)}_h)}\1_{\tilde{r}(a_h, f_h, u^{(t)}_h) \neq j}\right) \\
+    &\leq \sum_{k = 1}^K B_k(a_h, f_h, u^{(t)}_h)\Gamma^{-1}\left(-\sum_{j = 1}^K \frac{B_j(a_h, f_h, u^{(t)}_h)}{\sum_{k = 1}^K B_k(a_h, f_h, u^{(t)}_h)}\log\left(\frac{\exp\left(g_j(a_h, f_h, u^{(t)}_h)\right)}{\sum_{k = 1}^K\exp\left(g_k(a_h, f_h, u^{(t)}_h)\right)}\right) \right.\\&\quad\quad\quad\quad\quad\quad\quad\quad\quad\quad\quad\quad- \left.\inf_{\mathbf{g}} -\sum_{j = 1}^K \frac{B_j(a_h, f_h, u^{(t)}_h)}{\sum_{k = 1}^K B_k(a_h, f_h, u^{(t)}_h)}\log\left(\frac{\exp\left(g_j(a_h, f_h, u^{(t)}_h)\right)}{\sum_{k = 1}^K\exp\left(g_k(a_h, f_h, u^{(t)}_h)\right)}\right) \right) \\
+    &\overset{(a)}{\leq} \Bar{E}K\left(K- 1\right)\Gamma^{-1}\left(-\sum_{j = 1}^K \frac{B_j(a_h, f_h, u^{(t)}_h)}{\sum_{k = 1}^K B_k(a_h, f_h, u^{(t)}_h)}\log\left(\frac{\exp\left(g_j(a_h, f_h, u^{(t)}_h)\right)}{\sum_{k = 1}^K\exp\left(g_k(a_h, f_h, u^{(t)}_h)\right)}\right) \right.\\&\quad\quad\quad\quad\quad\quad\quad\quad\quad\quad\quad\quad- \left.\inf_{\mathbf{g}} -\sum_{j = 1}^K \frac{B_j(a_h, f_h, u^{(t)}_h)}{\sum_{k = 1}^K B_k(a_h, f_h, u^{(t)}_h)}\log\left(\frac{\exp\left(g_j(a_h, f_h, u^{(t)}_h)\right)}{\sum_{k = 1}^K\exp\left(g_k(a_h, f_h, u^{(t)}_h)\right)}\right) \right) \\
+    &\overset{(b)}{\leq} \Bar{E}K\left(K- 1\right)\Gamma^{-1}\left(-\sum_{j = 1}^K \frac{B_j(a_h, f_h, u^{(t)}_h)}{(K - 1)E_{min}}\log\left(\frac{\exp\left(g_j(a_h, f_h, u^{(t)}_h)\right)}{\sum_{k = 1}^K\exp\left(g_k(a_h, f_h, u^{(t)}_h)\right)}\right) \right.\\&\quad\quad\quad\quad\quad\quad\quad\quad\quad\quad\quad\quad- \left.\inf_{\mathbf{g}} -\sum_{j = 1}^K \frac{B_j(a_h, f_h, u^{(t)}_h)}{(K - 1)E_{min}}\log\left(\frac{\exp\left(g_j(a_h, f_h, u^{(t)}_h)\right)}{\sum_{k = 1}^K\exp\left(g_k(a_h, f_h, u^{(t)}_h)\right)}\right) \right) \\
+    &= \Bar{E}K\left(K- 1\right)\Gamma^{-1}\left(\frac{\Psi\left(\mathbf{g}, a_h, f_h, u^{(t)}_h, \mathcal{G}_h\left(a_h, f_h\right)\right)- \Psi^*\left(a_h, f_h, u^{(t)}_h\right)}{(K - 1)E_{min}} \right)
+\end{align*}
+(a) since $\left\|\left( I - C_{j} \circ \mathcal{L}_{h}^a\right)\left(e^{(t)}_h\right)\right\|^2_2 < \Bar{E}$ for all $j \in [K]$, (b) since $\Gamma^{-1}$ is non-decreasing and $\exists j \in [K]$ such that $\left\|\left( I - C_{j} \circ \mathcal{L}_{h}^a\right)\left(e^{(t)}_h\right)\right\|^2_2 > E_{min}$
+
+Finally,
+
+\begin{align*}
+    &\lim_{n \to \infty }\mathcal{R}_{\text{route}}\left(r_n\right) - \mathcal{R}_{\text{route}}^* \\
+    &\overset{(a)}{=} \lim_{n \to \infty } \mathbb{E}_{a_h, f_h \sim \mathcal{P}_{\mathcal{A} \times \mathcal{F}}}\left[l_{\text{route}}\left(r_n, a_h, f_h, u^{(t)}_h, \mathcal{G}_h\left(a_h, f_h\right)\right) - l_{\text{route}}^*\left(a_h, f_h, u^{(t)}_h\right)\right] \\
+    &\leq \lim_{n \to \infty } \mathbb{E}_{a_h, f_h \sim \mathcal{P}_{\mathcal{A} \times \mathcal{F}}}\left[\Bar{E}K\left(K- 1\right)\Gamma^{-1}\left(\frac{\Psi\left(\tilde{\mathbf{g}}, a_h, f_h, u^{(t)}_h, \mathcal{G}_h\left(a_h, f_h\right)\right)- \Psi^*\left(a_h, f_h, u^{(t)}_h\right)}{(K - 1)E_{min}} \right)\right] \\
+    &\overset{(b)}{\leq} \lim_{n \to \infty } \Bar{E}K\left(K- 1\right)\Gamma^{-1}\left(\frac{\mathbb{E}_{a_h, f_h \sim \mathcal{P}_{\mathcal{A} \times \mathcal{F}}}\left[\Psi\left(\mathbf{g}_n, a_h, f_h, u^{(t)}_h, \mathcal{G}_h\left(a_h, f_h\right)\right)- \Psi^*\left(a_h, f_h, u^{(t)}_h\right) \right]}{(K - 1)E_{min}}\right) \\
+    &= \lim_{n \to \infty } \Bar{E}K\left(K- 1\right)\Gamma^{-1}\left(\frac{\mathcal{R}_{\Psi}\left(\mathbf{g}_n\right) - \mathcal{R}_{\Psi}^*}{(K - 1)E_{min}}\right) \\
+    &\overset{(c)}{=} \Bar{E}K\left(K- 1\right)\Gamma^{-1}\left(\frac{\lim_{n \to \infty } \mathcal{R}_{\Psi}\left(\mathbf{g}_n\right) - \mathcal{R}_{\Psi}^*}{(K - 1)E_{min}}\right) \\
+    &= \Bar{E}K\left(K- 1\right)\Gamma^{-1}\left(0\right) \\
+    &\overset{(d)}{=} 0
+\end{align*}
+
+(a) $\mathcal{R}_{\text{route}}^*  = \mathbb{E}_{a_h, f_h \sim \mathcal{P}_{\mathcal{A} \times \mathcal{F}}}\left[l_{\text{route}}^*\left(a_h, f_h, u^{(t)}_h\right)\right]$ since the infimum is taken over all measurable functions, (b) by Jensen's inequality since $\Gamma^{-1}$ is concave, (c) by continuity of $\Gamma^{-1}$ at $0$, (d) $\Gamma^{-1}(0) = 0$
+
+% \begin{align*}
+%     \mathcal{R}_{\Psi}\left(\mathbf{g}_n\right) = \mathbb{E}_{a, f \sim \mathcal{P}_{\mathcal{A} \times \mathcal{F}}}\left[\Psi\left(\mathbf{g}, a, f, u^{(t)}, u\right)\right]
+% \end{align*}
+
+
+\end{proof}
+
+
+
+\section{Training Details} \label{sec:training details}
+
+Data for both DeepONet and the routers is sampled from a zero-mean Gaussian Random Field on the periodic domain with covariance operator $(- \Delta + 9I)^{-2}$ as mentioned in \Cref{sec:experiments}. We do this by generating samples in Fourier space: for each non-zero mode $k$, we draw an independent complex coefficient from a Gaussian distribution with mean 0 and variance $(4\pi^2 \|k\|^2_2 + 9)^{-2}$, enforce a Hermitian symmetry to obtain a real-valued field, set the DC mode to $0$ to ensure zero mean for Poisson, and apply inverse Discrete Fourier Transform to obtain the field in physical space. For each sample, we compute reference solutions with a least squares solver and treat them as ground truth. 
+
+This data is used to trained our DeepONet models and LSTM routers. All the models were implemented using PyTorch and all the models were trained on an Nvidia A40 GPU.
+
+\Cref{tab:hpsettings} contains all hyperparameter details for the DeepONet. DeepONet took 30 minutes to train. We then use the model with the best validation loss. 
+
+\begin{table}
+    \centering
+    \begin{tabular}{|c|c|}
+        \hline
+        Hyperparameter & Value\\
+        \hline \hline
+        Learning rate & 1e-3 \\
+        Branch Dimension & 64 \\
+        Hidden dimension for branch net & 128 \\
+        No. of hidden layers in branch net & 2\\
+        Hidden dimension for trunk net & 128 \\
+        No. of hidden layers in trunk net & 2\\
+        Gradient Clipping Norm & 1.0  \\
+        Weight Decay & 0.005 \\
+        Batch size & 128 \\
+        Training samples & 15000 \\
+        Validation samples & 3000 \\
+        Epochs & 100 \\
+        % Hidden layers & 1 & 3 & 1  \\
+        % Hidden units & 8 & 128 & 8   \\
+        % Dropout & 0.2 & 0.4 & 0.2   \\
+        % Epochs & 200 & 100 & 200  \\
+        % Training Samples & 2400 & 800 & 2400  \\
+        % Gradient Clipping Norm & 1.0 & 1.0 & 1.0  \\
+        % Weight Decay & 0.005 & 0.001 & 0.005  \\
+        \hline
+    \end{tabular}
+    \caption{Hyperparameter settings for DeepONet}
+    \label{tab:hpsettings}
+\end{table}
+
+The routers are LSTM models trained with scheduled sampling.
+We use a warm-up of $e_{w}$ epochs with teacher-forcing probability $p_{tf}(e) = ss_{\text{start}}$. After the warm-up, the $p_{tf}$ decays geomterically by a factor of $\gamma_{tf} < 1$ per epoch and is floored by $s_{\text{end}}$:
+\begin{equation*}
+    p_{tf}(e) = \begin{cases}
+        ss_{\text{start}} & e \leq e_w\\
+        \max(ss_{start}\gamma_{tf}^{e - e_{w}}, ss_{end}) & e > e_w
+    \end{cases}
+\end{equation*}
+At each time step, with probability $p_{tf}(e)$, we feed the teacher-forced greedy iterate; otherwise, we feed the router's own predicted iterate.
+
+
+Since LSTMs on long rollouts can suffer from exploding/vanishing gradients, we use truncated backpropagation through time (TBPTT) \citep{mozer2013focused,robinson1987utility,werbos1988generalization}: the forward pass unrolls the entire trajectory, but gradients are propagated only through the most recent $w_{\text{bptt}}(e)$ steps at epoch $e$. Hidden states are passed forward between segments, while earlier segments are treated as stop-gradient.
+
+We employ a curriculum learning approach analogous to scheduled sampling. Let $T_{\max}$ be the horizon ($300$ for Jacobi/GS and $100$ for MG). With a warm-up of $e_w$ epochs,
+\begin{equation}
+    w_{\text{bptt}}(e)  = 
+    \begin{cases}
+        w_{\text{start}} & e \leq e_w \\
+        \min\left(T_{\max}, w_{\text{start}}\gamma_{\text{bptt}}^{\left\lfloor \frac{e - e_w}{f_{\text{bptt}}}\right\rfloor} \right) & e > e_w
+    \end{cases}
+\end{equation}
+so the window grows geometrically by a factor of $\gamma_{\text{bptt}} > 1$ every $f_{\text{bptt}}$ epochs and is capped at the full trajectory length.
+
+\Cref{tab:routerhpsettings} contains all hyperparameter details for the LSTM routers. The routers took a maximum of 4 hours and 30 minutes to train. We then use the model with the best validation loss for testing.  Data-related details in \Cref{tab:routerhpsettings}  apply to all of our trained routers except the routers for the experiment with increasing $K$ which were trained with $1024$ training samples and $128$ validations samples to encourage the model to learn some of the nuanced differences between the classes.
+
+\begin{table}
+    \centering
+    \begin{tabular}{|c|c|}
+        \hline
+        Hyperparameter & Value\\
+        \hline \hline
+        Learning rate & 1e-3 \\
+        Branch Dimension & 64 \\
+        Hidden dimension & 64 \\
+        No. of hidden layers & 3\\
+        Gradient Clipping Norm & 1.0  \\
+        Weight Decay & 0.005 \\
+        Batch size & 32 \\
+        Training samples & 64 \\
+        Validation samples & 32 \\
+        Epochs & 100 \\
+        $ss_{\text{start}}$ & 1.0\\
+        $\gamma_{tf}$ & $0.95$ \\
+        $ss_{\text{end}}$ & 0.0 \\
+        $w_{\text{start}}$ & $0.1T_{\max}$ \\
+        $\gamma_{\text{bptt}}$ & $1.25$ \\
+        $e_w$ & 10 \\
+        $f_{\text{bptt}}$ & $4$ \\
+        % Hidden layers & 1 & 3 & 1  \\
+        % Hidden units & 8 & 128 & 8   \\
+        % Dropout & 0.2 & 0.4 & 0.2   \\
+        % Epochs & 200 & 100 & 200  \\
+        % Training Samples & 2400 & 800 & 2400  \\
+        % Gradient Clipping Norm & 1.0 & 1.0 & 1.0  \\
+        % Weight Decay & 0.005 & 0.001 & 0.005  \\
+        \hline
+    \end{tabular}
+    \caption{Hyperparameter settings for routers}
+    \label{tab:routerhpsettings}
+\end{table}
+
+
+
+\section{Additional Experimental Results} \label{sec:moreexperimentalresults}
+
+\subsection{Convergence Histories} \label{sec:convergencehistories}
+
+See \Cref{fig:errorcomparison2}
+
+\begin{figure}[!]
+    \centering
+    \includegraphics[width=0.75\linewidth]{images/convergencehistory1dpoisson2dhelmholtz.png}
+    \caption{Convergence histories for representative test instances. Rows: 1D Poisson (top) and 2D Helmholtz (bottom). Columns: Jacobi, Gauss–Seidel (GS), and multigrid (MG). Greedy yields near-monotone decay and the lowest errors, whereas HINTS shows sawtooth behaviors.}
+    \label{fig:errorcomparison2}
+\end{figure}
+
+\subsection{Residual Comparison} \label{sec:residualcomparison}
+
+\begin{table}[]
+    \centering
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{|c|c|c|c|c|c|c|c|c|}
+        \hline
+         Equation & \multicolumn{2}{|c|}{1D Poisson} & \multicolumn{2}{|c|}{2D Poisson} & \multicolumn{2}{|c|}{1D Helmholtz}& \multicolumn{2}{|c|}{2D Helmholtz} \\
+         \hline 
+         Methods & $\|\mathcal{L}_h^ae^{(T)}_h\|$ & AUC & $\|\mathcal{L}_h^ae^{(T)}_h\|$ & AUC& $\|\mathcal{L}_h^ae^{(T)}_h\|$ & AUC & $\|\mathcal{L}_h^ae^{(T)}_h\|$ & AUC\\
+         \hline
+         \multicolumn{9}{|c|}{Jacobi-related Solvers} \\
+        \hline
+        Jacobi Only & 7.775 (4.237) & 5156.608 (2729.501) & 2.842 (1.124) & 4979.462 (1570.207)& \textbf{8.89 (4.62)} & 5977.502 (3061.518) & \textbf{2.653 (1.049)}& \textbf{4885.359 (1536.61)} \\
+        HINTS-Jacobi & \textbf{4.871 (1.526)} & 2511.313 (1113.55) & 94.061 (0.431) & 6194.836 (480.136) & 23.035 (12.824) & 6860.808 (3824.142) & 24.066 (0.258) & 5486.311 (1491.338) \\
+        Greedy-Jacobi & 5.684 (4.186) & \textbf{2505.155 (1638.618)} & \textbf{1.225 (0.643)} & \textbf{2097.546 (468.004)} & 14.339 (13.896) & \textbf{5967.264 (5235.896)} & \textbf{2.653 (1.049)} & \textbf{4885.359 (1536.61)} \\
+        \hline
+         \multicolumn{9}{|c|}{GS-related Solvers} \\
+         \hline
+        GS Only & 2.001 (1.091) & 3272.362 (1741.517) & 0.202 (0.08) & 2686.598 (858.228) & 2.209 (1.15) & 3767.204 (1933.993) & \textbf{0.176 (0.07)} & \textbf{2625.785 (836.048)}\\
+        HINTS-GS & 2.749 (0.001) & 904.028 (394.014) & 115.382 (0.001) & 4945.064 (339.648) & 5.727 (3.043) & 1193.716 (487.82) & 23.431 (0.02) & 3181.072 (817.491) \\
+        Greedy-GS & \textbf{0.012 (0.007)} & \textbf{170.604 (57.765)} & \textbf{0.027 (0.008)} & \textbf{998.784 (193.159)} & \textbf{0.035 (0.015)} & \textbf{250.746 (89.774)} & \textbf{0.176 (0.07)} & \textbf{2625.785 (836.048)} \\
+        \hline
+         \multicolumn{9}{|c|}{MG-related Solvers} \\
+         \hline
+        MG Only & 1.961 (0.541) & 819.828 (292.076) & 0.093 (0.022) & 460.981 (111.146) & 2.017 (0.529) & 899.308 (313.69) & \textbf{0.081 (0.02)} & \textbf{448.77 (108.006)} \\
+        HINTS-MG & 0.138 & 354.601 (149.921) & 3.246 & 1414.353 (73.994) & 0.49 (0.196) & 451.287 (178.914) & 0.653 (0.052) & 640.516 (101.671) \\
+            Greedy-MG & \textbf{0.019 (0.012)} & \textbf{61.195 (17.887)} & \textbf{0.022 (0.005)} & \textbf{284.36 (51.462)} & \textbf{0.053 (0.022)} & \textbf{99.709 (37.971)} & \textbf{0.081 (0.02)} & \textbf{448.77 (108.006)} \\
+         \hline
+    \end{tabular}
+    }
+    \caption{Final residual and AUC of squared $L^2$ residual (lower is better). Values are mean ($\pm$ standard error (s.e.)) over 64 test instances; both mean and s.e. are reported in $\times 10^{-3}$. If a standard error is not shown, it is $< 10^{-3}$ in the reported units (raw $< 10^{-6}$). Bold indicates the best method within each solver family.}
+    \label{tab:residualcomparison}
+\end{table}
+\begin{table}[]
+    \centering
+    \begin{tabular}{|c|c|c|c|c|}
+        \hline
+         Equation & \multicolumn{2}{|c|}{1D Poisson} & \multicolumn{2}{|c|}{1D Helmholtz}\\
+         \hline 
+        \# of Solvers & $\|\mathcal{L}_h^ae^{(T)}_h\|$ & AUC & $\|\mathcal{L}_h^ae^{(T)}_h\|$ & AUC \\
+         \hline
+        2 & 0.121 (0.055) & 473.906 (158.205) & 0.321 (0.113) & 679.886 (252.811)  \\
+        3 & 0.078 (0.042) & 360.389 (119.802) & 0.21 (0.08) & 530.239 (195.882)\\
+        4 & 0.067 (0.038) & 328.62 (109.061) & 0.181 (0.072) & 490.084 (183.068)  \\
+        5 & 0.061 (0.035) & 319.509 (105.729) & 0.166 (0.067) & 470.193 (176.504) \\
+        6 & 0.045 (0.027) & 288.867 (96.794) & 0.165 (0.067) & 487.057 (192.411) \\
+         \hline
+    \end{tabular}
+
+    \caption{Final residual and AUC of squared $L^2$ residual for varying numbers of solvers. Values are mean ($\pm$ standard error (s.e.)) over 64 test instances; both mean and s.e. are reported in $\times 10^{-3}$.}
+    \label{tab:residualcomparison2}
+\end{table}
+
+
+\Cref{tab:residualcomparison} summarizes the performance of single-solver schedules, HINTS, and greedy with respect to the final residuals $r_h^{(T)} =\|f_h - \mathcal{L}_h^a u_h^{(T)}\|$ or $\|\mathcal{L}_h^a e_h^{(T)}\|$ and its AUC $AUC_T = \sum_{t = 1}^T\|r^{(t)}_h\|^2_2$ . Greedy outperforms its HINTS and single-solver counterparts in most equations. We must note that our greedy router is trained to reduce error, not residual. The same error can induce very different residuals depending on the spectrum $\mathcal{L}_h^a$. \Cref{tab:residualcomparison2} exhibits how residuals are affected by the number of solvers in the solver ensemble. Similar to error, we observe both the final residual and AUC decrease as the number of solvers increase.
+
+
+
+\subsection{Fourier mode-wise error comparison} \label{sec:fouriermodeerrorcomparison}
+
+ 
+
+\begin{table}[]
+    \centering
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{|c|c|c|c|c|c|c|c|c|c|c|c|c|}
+        \hline
+         Equation & \multicolumn{6}{|c|}{1D Poisson} & \multicolumn{6}{|c|}{2D Poisson} \\
+        \hline
+         Methods/ Mode & Mode 1 Error & Mode 1 AUC & Mode 5 Error & Mode 5 AUC &Mode 10 Error &Mode 10 AUC & Mode 1 Error & Mode 1 AUC & Mode 5 Error & Mode 5 AUC &Mode 10 Error &Mode 10 AUC\\
+         \hline
+         \multicolumn{13}{|c|}{Jacobi-related Solvers} \\
+        \hline
+        Jacobi Only & 1.124 (0.612) & 732.713 (399.296) & -  & \textbf{0.076 (0.043)} & - & \textbf{0.001}  & 0.03 (0.014) & 382.094 (183.783) & \textbf{-} & \textbf{0.012 (0.006)} & \textbf{-} & \textbf{-}\\
+        HINTS-Jacobi & 0.059 (0.024) & 128.076 (64.871) & 0.001 (0.001) & 0.348 (0.121) & - & 0.041 (0.021) & 0.296 (0.003) & 227.594 (78.715) & 0.003 & 0.169 (0.055) & 0.001 & 0.03 (0.009) \\
+        Greedy-Jacobi & \textbf{0.006 (0.004)} & \textbf{4.152 (2.593)} & - & 0.192 (0.094) & - & 0.025 (0.016) & \textbf{0.009 (0.004)} & \textbf{114.046 (54.747)} & \textbf{-} & 0.105 (0.057) & \textbf{-} & 0.014 (0.008)\\
+        \hline
+        \multicolumn{13}{|c|}{GS-related Solvers} \\
+        \hline
+        GS Only & 0.285 (0.155) & 458.834 (250.064) & \textbf{-} & 0.223 (0.136) & - & 0.096 (0.072) & \textbf{-} & 196.347 (94.367) & - & 0.014 (0.007) & \textbf{-} & \textbf{0.001}\\
+        HINTS-GS & 0.017 & 100.582 (52.598) & 0.001 & 0.176 (0.049) & -  & 0.049 (0.028) & 0.258  & 168.877 (59.252) & 0.003 & 0.162 (0.032) & 0.001  & 0.052 (0.006)\\
+        Greedy-GS & \textbf{0.002 (0.001)} & \textbf{2.661 (1.595)} & \textbf{-} & \textbf{0.12 (0.058)} & - & \textbf{0.026 (0.015)} & \textbf{-} & \textbf{62.858 (30.237)} & - & \textbf{0.09 (0.044)} & \textbf{-} & 0.014 (0.007) \\
+         \hline
+         \multicolumn{13}{|c|}{Multigrid methods} \\
+         \hline
+        MG Only & 0.282 (0.078) & 116.885 (42.581) & - & 0.043 (0.022) & - & 0.013 (0.007) & 0.001  & 25.497 (11.766) & - & \textbf{0.003 (0.001)} & - & \textbf{-}\\
+        HINTS-MG & 0.014 & 43.405 (20.908) & - & \textbf{0.027 (0.006)} & - & 0.009 (0.003) & 0.078 & 31.289 (10.201) & - & 0.035 (0.004) & - & 0.01 (0.001)\\
+        Greedy-MG & \textbf{0.003 (0.002)} & \textbf{0.999 (0.622)} & - & 0.029 (0.013) & - & \textbf{0.008 (0.005)} & \textbf{-} & \textbf{13.358 (6.045)} & - & 0.031 (0.016) & - & 0.007 (0.004) \\
+         \hline
+    \end{tabular}
+    }
+    \caption{Final error and AUC of squared $L^2$ error for Mode 1, 5, and 10 (lower is better) for 1D/2D Poisson. Values are mean ($\pm$ standard error (s.e.)) over 64 test instances; both mean and s.e. are reported in $\times 10^{-3}$. If a standard error is not shown, it is $< 10^{-3}$ in the reported units (raw $< 10^{-6}$). Bold indicates the best method within each solver family.}
+    \label{tab:modecomparisonPoisson}
+\end{table}
+
+\begin{table}[]
+    \centering
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{|c|c|c|c|c|c|c|c|c|c|c|c|c|}
+        \hline
+         Equation & \multicolumn{6}{|c|}{1D Helmholtz} & \multicolumn{6}{|c|}{2D Helmholtz} \\
+        \hline
+         Methods/ Mode & Mode 1 Error & Mode 1 AUC & Mode 5 Error & Mode 5 AUC &Mode 10 Error &Mode 10 AUC & Mode 1 Error & Mode 1 AUC & Mode 5 Error & Mode 5 AUC &Mode 10 Error &Mode 10 AUC\\
+         \hline
+         \multicolumn{13}{|c|}{Jacobi-related Solvers} \\
+        \hline
+        Jacobi Only & 1.253 (0.651) & 835.102 (434.018) & \textbf{-} & \textbf{0.078 (0.044)} & \textbf{-} & \textbf{0.001}  & \textbf{0.028 (0.013)} & \textbf{372.63 (179.23)} & \textbf{-} & \textbf{0.012 (0.006)} & \textbf{-} & \textbf{-} \\
+        HINTS-Jacobi & 0.099 (0.047) & 140.399 (63.534) & 0.004 (0.002) & 0.576 (0.2) & 0.001 (0.001) & 0.088 (0.044) & 0.493 (0.025) & 427.437 (170.326) & 0.007  & 0.19 (0.006) & 0.002  & 0.026  \\
+        Greedy-Jacobi & \textbf{0.023 (0.027)} & \textbf{15.089 (13.203)} & \textbf{-} & 0.577 (0.635) &\textbf{-}& 0.078 (0.057) & \textbf{0.028 (0.013)} & \textbf{372.63 (179.23)} & \textbf{-} & \textbf{0.012 (0.006)} & \textbf{-} & \textbf{-} \\
+        \hline
+        \multicolumn{13}{|c|}{GS-related Solvers} \\
+        \hline
+         GS Only & 0.307 (0.159) & 519.339 (269.921) & \textbf{-} & 0.242 (0.146) & \textbf{- }& 0.105 (0.078) & \textbf{-} & \textbf{191.408 (91.996)} & \textbf{-} & \textbf{0.014 (0.007)} & \textbf{-} & \textbf{0.001}  \\
+        HINTS-GS & 0.07 (0.028) & 127.525 (59.386) & 0.003 (0.002) & 0.296 (0.09) & 0.001 (0.001) & 0.105 (0.052) & 0.309  & 233.092 (88.614) & 0.007  & 0.191 (0.007) & 0.002  & 0.024  \\
+        Greedy-GS & \textbf{0.004 (0.002)} & \textbf{7.034 (3.179)} & \textbf{-} & \textbf{0.179 (0.1)} & \textbf{-} & \textbf{0.058 (0.036)} & \textbf{-} & \textbf{191.408 (91.996)} & \textbf{-} & \textbf{0.014 (0.007)} & \textbf{-} & \textbf{0.001}  \\
+         \hline
+         \multicolumn{13}{|c|}{Multigrid methods} \\
+         \hline
+        MG Only & 0.283 (0.074) & 125.54 (44.397) & - & 0.043 (0.022) & - & \textbf{0.013 (0.007)} & \textbf{0.001}  & \textbf{24.863 (11.508)} & - & \textbf{0.002 (0.001)} & - & \textbf{-} \\
+        HINTS-MG & 0.055 (0.022) & 52.357 (23.002) & - & 0.054 (0.02) & - & 0.023 (0.009) & 0.074 (0.001) & 32.657 (11.313) & - & 0.051 (0.001) & - & 0.009  \\
+        Greedy-MG & \textbf{0.007 (0.003)} & \textbf{2.678 (1.159)} & - & \textbf{0.041 (0.019)} & - & 0.016 (0.011) & \textbf{0.001}  & \textbf{24.863 (11.508)} & - & \textbf{0.002 (0.001)} & - & \textbf{-} \\
+         \hline
+    \end{tabular}
+    }
+    \caption{Final error and AUC of squared $L^2$ error for Mode 1, 5, and 10 (lower is better) for 1D/2D Helmholtz. Values are mean ($\pm$ standard error (s.e.)) over 64 test instances; both mean and s.e. are reported in $\times 10^{-3}$. If a standard error is not shown, it is $< 10^{-3}$ in the reported units (raw $< 10^{-6}$). Bold indicates the best method within each solver family.}
+    \label{tab:modecomparisonHelmholtz}
+\end{table}
+
+
+\begin{table}[]
+    \centering
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{|c|c|c|c|c|c|c|c|c|c|c|c|c|}
+        \hline
+         Equation & \multicolumn{6}{|c|}{1D Poisson} & \multicolumn{6}{|c|}{1D Helmholtz} \\
+        \hline
+         \# of Solvers/ Mode & Mode 1 Error & Mode 1 AUC & Mode 5 Error & Mode 5 AUC &Mode 10 Error &Mode 10 AUC & Mode 1 Error & Mode 1 AUC & Mode 5 Error & Mode 5 AUC &Mode 10 Error &Mode 10 AUC\\
+         \hline
+         2 & 0.013 (0.008) & 5.549 (3.466) & - & 0.396 (0.194) & - & 0.057 (0.035) & 0.035 (0.015) & 15.082 (6.582) & - & 0.608 (0.352) & - & 0.115 (0.082) \\
+        3 & 0.01 (0.006) & 5.007 (3.126) & - & 0.293 (0.143) & - & 0.04 (0.025) & 0.027 (0.012) & 13.577 (5.925) & - & 0.449 (0.26) & - & 0.082 (0.058) \\
+        4 & 0.009 (0.006) & 4.779 (2.984) & - & 0.263 (0.128) & - & 0.036 (0.023) & 0.024 (0.011) & 12.943 (5.648) & - & 0.399 (0.231) & - & 0.072 (0.051) \\
+        5 & 0.008 (0.005) & 4.654 (2.906) & 0.0 (0.0) & 0.257 (0.125) & 0.0 (0.0) & 0.036 (0.023) & 0.022 (0.01) & 12.571 (5.486) & - & 0.376 (0.217) & - & 0.068 (0.049) \\
+        6 & 0.006 (0.004) & 4.174 (2.606) & - & 0.212 (0.104) & - & 0.029 (0.018) & 0.022 (0.01) & 12.535 (5.47) & - & 0.355 (0.205) & - & 0.061 (0.043) \\
+         \hline
+    \end{tabular}
+    }
+    \caption{Final error and AUC of squared $L^2$ error of Mode 1, 5, and 10 for varying numbers of solvers. Values are mean ($\pm$ standard error (s.e.)) over 64 test instances; both mean and s.e. are reported in $\times 10^{-3}$.}
+    \label{tab:modecomparison2}
+\end{table}
+
+
+We assess frequency-resolved performance by projecting the error onto the discrete Fourier basis. \Cref{tab:modecomparisonPoisson,tab:modecomparisonHelmholtz} report, for modes 1, 5, and 10, the mode-wise final error and mode-wise AUC, comparing single-solver baselines, HINTS, and the greedy router. As a result of including a deep learning model,Greedy consistently achieves the smallest mode-1 error/AUC across equations and solver families. For modes 5 and 10, single-solver schedules sometimes have an edge, reflecting the tendency of classical smoothers to damp high-frequency components more aggressively than ML surrogates (spectral bias). Overall, greedy delivers more uniform convergence across the spectrum: it routes to whichever solver most decreases the full $L^2$ error, and by Parseval’s identity $|e_h^{(t)}|_2^2=\sum_m|\hat u_m^{(t)}-\hat u_m|^2$, reductions in the objective correspond to reducing energy across all modes rather than giving preferential treatment to a subset. Additionally, in \Cref{tab:modecomparison2}, we observe that all mode-wise errors/AUCs reduce with the inclusion of more solvers. 
+
+% \begin{table}[]
+%     \centering
+%     \begin{tabular}{|c|c|c|c|c|c|c|c|c|c|}
+%         \hline
+%          Methods/ Equation & \multicolumn{3}{|c|}{1D Poisson} &\multicolumn{3}{|c|}{2D Poisson} & \multicolumn{3}{|c|}{2D Helmholtz}\\
+%          \hline
+%          &Mode 1 Error & Mode 5 Error  & Mode 10 error&Mode 1 Error & Mode 5 Error  & Mode 10 error&Mode 1 Error & Mode 5 Error  & Mode 10 error\\
+%          \hline
+         
+%          \multicolumn{10}{|c|}{Jacobi-related Solvers} \\
+%         \hline
+%         Jacobi Only & 732.713 (399.296) & 0.076 (0.043) & 0.001 (0.0) & NaN & NaN & NaN & NaN & NaN & NaN \\
+%         HINTS-Jacobi & 128.076 (64.871) & 0.348 (0.121) & 0.041 (0.021) & NaN & NaN & NaN & NaN & NaN & NaN \\
+%         Greedy-Jacobi & 4.152 (2.593) & 0.192 (0.094) & 0.025 (0.016) & NaN & NaN & NaN & NaN & NaN & NaN \\
+%         \hline
+%         \multicolumn{10}{|c|}{GS-related Solvers} \\
+%         \hline
+%         GS Only & 458.834 (250.064) & 0.223 (0.136) & 0.096 (0.072) & NaN & NaN & NaN & NaN & NaN & NaN \\
+%         HINTS-GS & 100.582 (52.598) & 0.176 (0.049) & 0.049 (0.028) & NaN & NaN & NaN & NaN & NaN & NaN \\
+%         Greedy-GS & 2.661 (1.595) & 0.12 (0.058) & 0.026 (0.015) & NaN & NaN & NaN & NaN & NaN & NaN \\
+%         Greedy-GS,Jacobi & 4.162 (2.504) & 0.158 (0.078) & 0.023 (0.015) & NaN & NaN & NaN & NaN & NaN & NaN \\
+%         \hline
+%          \multicolumn{10}{|c|}{Multigrid methods} \\
+%          \hline
+%         MG Only & 116.885 (42.581) & 0.043 (0.022) & 0.013 (0.007) & NaN & NaN & NaN & NaN & NaN & NaN \\
+%         HINTS-MG & 43.405 (20.908) & 0.027 (0.006) & 0.009 (0.003) & NaN & NaN & NaN & NaN & NaN & NaN \\
+%         Greedy-MG & 0.999 (0.622) & 0.029 (0.013) & 0.008 (0.005) & NaN & NaN & NaN & NaN & NaN & NaN \\
+%          \hline
+%     \end{tabular}
+%     \caption{AUC of Modewise errors in $\times 10^{-3}$ over 300 iterations}
+%     \label{tab:modewiseerrorcomparison}
+% \end{table}
+
+
+% \begin{figure}
+%     \centering
+%     \includegraphics[width=\linewidth]{images/modecomparison1dpoissonfinal.png}
+%     \caption{Mode-wise Error Comparison}
+%     \label{fig:modewiseerrorcomparison}
+% \end{figure}
+
+\section{LLM Usage}
+
+LLMs, specifically ChatGPT and Gemini, supported the writing process in an iterative manner. We drafted paragraphs and asked the models for feedback on grammar and clarity. We then incorporated selected suggestions into the writing and repeated this process until we were satisfied with the writing. 
+
+The code developed for the experiments was written by the authors with the help of occasional code completions. The central components (e.g., the hybrid solver implementation and the greedy-router training pipelines) were implemented exclusively by the authors.
+
+All substantive intellectual contributions, which include ideas, theorems, and analyses, are our own. LLMs were occasionally used to verify the correctness of proofs, but all proof strategies originated from the authors and relevant literature.
+
+
+
+\end{document}
+

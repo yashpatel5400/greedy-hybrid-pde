@@ -1,0 +1,509 @@
+\documentclass[12pt]{article}
+\usepackage[english]{babel}
+\usepackage[utf8x]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{myst}
+\usepackage{csquotes}
+\usepackage{listings}
+\usepackage{hyperref}
+\usepackage{cleveref}
+\usepackage{soul}
+\usepackage{bbm}
+
+% \DeclareNameAlias{sortname}{family-given}
+
+% \defbibenvironment{bibliography}
+%   {\begin{enumerate}}
+%   {\end{enumerate}}
+%   {\item}
+
+\addbibresource{mybib.bib}
+
+
+
+\Author{}
+\Date{June 30}
+\Title{Proposal: Collaborative PDE Solver using Neural Operators and Multigrid methods}
+
+\lstset{style=mystyle}
+
+\begin{document}
+	\MakeScribeTop
+
+\section{Introduction} \label{sec:intro}
+
+Natural phenomena and engineered systems are often governed by ordinary and partial differential equations. Solving these equations enables a variety of tasks - predicting the evolution of the system through simulation (e.x., forecasting weather using Navier Stokes Equation) \autocite{kalnay2003atmospheric,bauer2015quiet,staniforth1991semi}, addressing control and optimization problems (e.x., optimizing heat shield design for spacecrafts using heat transfer equations) \autocite{anderson1989hypersonic,troltzsch2010optimal}, and tackling inverse problems based on external measurements (e.x. reconstructing brain activity from EEG data using electrophysiological models) \autocite{baillet2001electromagnetic,grech2008review}. 
+
+Traditionally, PDEs are solved using finite difference methods \autocite{smith1985numerical,leveque2007finite}, which discretize the spatial and/or temporal domain and approximate the solution by solving a system of equations at the discrete grid points. Similarly, finite element methods \autocite{hughes2003finite,bathe2006finite,brenner2008mathematical} construct a system of equations based on fitted curves for each finite element and then rely on numerical linear algebra techniques--such as the Jacobi and Gauss-Seidel method \autocite{saad2003iterative}--to compute the solution. Such iterative methods, however, suffer from high computational costs, especially when finely resolved grids are required--regardless of the sparsity of the coefficient matrix. Moreover, these solvers lack generalization across different initial conditions, boundary conditions, or forcing functions, as even minor changes to any of these parameters require re-solving the entire system of equations from scratch. 
+
+These challenges have motivated the development of neural operators \autocite{kovachki2023neural} - a class of machine learning models that aim to learn the solution operator directly, enabling fast inference across a range of parameters. Neural operators lift the classical linear layer in neural networks to a linear operator--typically a kernel integral operator--between infinite-dimensional function spaces. While the universal approximation theorem of operators \autocite{chen1995universal} suggests that neural operators can approximate solution operators with high accuracy, they are prone to spectral bias \autocite{liu2021multiscale,liu2024mitigating,you2024mscalefno,khodakarami2025mitigating,xu2025understanding}--similar to traditional neural networks \autocite{rahaman2019spectral,xu2019frequency}--and favor learning the low-frequency components of the solution operator, often struggling to capture high-frequency features that iterative solvers excel at. 
+
+Recognizing this complementarity, HINTS \autocite{zhang2024blending} proposes a hybrid solver that leverages the advantages of traditional iterative methods and neural operators  to learn a wide range of eigenmodes more uniformly and quickly. It achieves this by periodically incorporating predictions from a neural operator into iterative updates of the traditional solver. While HINTS observes significant empirical performance improvements in convergence and accuracy when compared to using the standalone neural operator and Jacobi solver, the algorithm's fixed number of solver iterations between neural operator passes can be viewed as wasteful if the high frequency errors are overly dampened, or insufficient if not dampened enough. Furthermore, when HINTS employs multigrid methods, they are often restricted to cycle patterns, i.e. V cycle or W cycle, of fixed depths making it difficult to adapt cycle patterns in response to the distribution of errors across the learned eigenmodes.
+% We propose a model-based router that
+
+We present Adaptive HINTS which borrows ideas from learning to defer to make both the number of iterations of the traditional solver and the number of discretization levels in the multigrid solver adaptive to the distribution of spectral errors. It does so using a router that guides the collaboration between the neural operators and the various multigrid solvers, ensuring uniform convergence across frequencies. We propose loss functions for training a router wrapper for pretrained neural operators and joint training of the neural operators and router. The joint training approach makes the Neural Operator focus on learning eigenmodes that the iterative solvers struggle to capture. Additionally, this loss function incorporates the computational cost of each solver, ensuring optimal convergence under user-defined time budget constraints.
+
+% with the time cost of an iteration of jacobi solver and a neural operator pass in mind. 
+% can be useful in predicting the evolution of a system through simulation, solving control and optimization problems, and solve inverse problems based on external measurements. 
+% Modeling and understanding natural phenomena and engineered systems often boils down to solving differential equations. `
+% \begin{itemize}
+%     \item \st{Para 1: Explain the importance of solving PDEs}
+%     \item \st{Para 2: introduce numerical methods but it's expensive and the iterative method must be run each time the conditions change.}
+%     \item \st{Para 3: Introduce neural operators. but spectral bias}
+%     \item \st{Para 4: talk about HINTs vaguely but what might be some issues with it cost-accuracy tradeoff}
+%     \item Goals of proposed method: Principled guided collaboration between the numerical solver and the neural operator to ensure faster convergence of multigrid methods. This guided collaboration includes learning when to switch to 
+%     \item Goal: make the neural operator aware of this collaboration and focus it's training on low frequency modes  which it does anyway but perhaps focus on low frequency modes that can't be captures with the multigrid system. So learn the weakenesses of the solvers and work around it.
+%     \item 
+%     \item \st{(Stretch Goal) some theoretical results characterizing spectral bias}
+% \end{itemize}
+
+
+\section{Problem Setting and Background} \label{sec:background}
+
+Let $\mathcal{A} = \{a: D \to \mathbb{R}^d\}$ be an infinite-dimensional Banach space of coefficient functions and $\mathcal{U} = \{u: D \to \mathbb{R}^m\}$ be the infinite dimensional Banach space of output functions where $D \subseteq \mathbb{R}^n$ is the spatial domain. Let's consider the following Linear PDE:
+\begin{align}
+    \mathcal{L}_{x}\left(u;a\right) &= f ,&x \in D \label{eq:mainpde}\\
+    \mathcal{B}_{x}\left(u\right) &= g ,& x \in \partial D
+\end{align}
+% $$\mathcal{L}_{x}\left(u;k\right) = f$$
+where $a \in \mathcal{A} $ is some coefficient function,  $u \in \mathcal{U}$ is the solution to the PDE, $\mathcal{L}_x$ is a differential operator parameterized by $a$,  $f \in \mathcal{U}$ is an external forcing function, $\mathcal{B}_{x}$ is the boundary operator, and $g$ is the boundary term .  
+
+PDEs of this form can be solved using a variety of numerical methods, including finite difference, finite element, spectral methods \autocite{boyd2001chebyshev,canuto2006spectral}, and neural operators. In this paper, however, we focus specifically on establishing efficient collaborations between iterative or multigrid solvers from finite difference discretizations and neural operators.
+
+\subsection{Finite Difference Methods} \label{sec:finitedifference}
+
+Finite difference methods \autocite{smith1985numerical,leveque2007finite} represent a class of numerical methods that approximate solutions to partial differential equations by replacing partial derivatives with discrete differential quotients. For example, the first derivative can be approximated as $\frac{\partial u(x)}{\partial x} \approx \frac{u(x + h) - u(x)}{h}$. When the entire domain is discretized,  evaluating the solution to the PDE $u$ at these grid points reduces to solving a system of algebraic equations or $Au = b$. While direct methods like Gauss Elimination and Thomas Algorithm are often employed to approximate the solution to such systems of equations, they can be computationally expensive in high-dimensional domains. In contrast, iterative methods like Jacobi and Gauss-Seidel provide computational speedups by iteratively updating the solution, gradually converging to the true solution for the PDE. 
+
+However, convergence is often slower on low frequency components of the solution. Multigrid solvers \autocite{briggs2000multigrid,trottenberg2001multigrid,hackbusch2013multi} tackle this problem by allowing high frequency error components to be sufficiently dampened on a finer discretization and leaving the smooth parts of the error to a coarser grid where low frequency function appear high frequency. 
+
+Let $A_h, A_{2h}$ represent the coefficient matrix on a fine grid with discretization parameter $h$ and $2h$, $u_h$ and $f_h$ represent the PDE solution and constant vector on a grid discretized by $h$, $R^{2h}_h$ denote the restriction matrix which transfers vectors from a fine grid to a coarse one, and $I^{h}_{2h}$ is the interpolation matrix transfers vectors from a coarse grid to a fine one. In a 2-grid method, a few iterations of the smoother (e.x. Jacobi or Gauss-Seidel) are first applied on the fine grid to approximate the solution of $A_hu_h = f_h$. The residual is then computed as $r_h = f_h - A_hu_h$ and restricted to the coarse grid via $r_{2h} = R^{2h}_hr_h$. The error equation, $A_{2h}e_{2h} = r_{2h}$, is solved on the coarse grid. The resulting estimate of the error is interpolated in the fine grid by $e_h = I^{h}_{2h}e_{2h}$, and the fine grid solution is updated by adding this correction, $u_h = u_h + e_h$. Finally, additional smoothing steps are performed on the fine grid to further reduce any high frequency errors. 
+
+More complex strategies for multigrid like V-cycle and W-cycle compute error corrections recursively across multiple grids of varying coarseness (See \Cref{sec:multigrid} for pseudocode of these methods).
+
+
+
+\subsection{Neural Operators} \label{sec:neuraloperators}
+
+Suppose we have some observations $\{(a_i, f_i, u_i)\}_{i = 1}^N$ such that $(a_i, f_i) \sim \mu$ are i.i.d. samples drawn from some distribution. Let $u_i$ is generated using a solution operator called $\mathcal{G}^{*} : \mathcal{A} \times \mathcal{U} \to \mathcal{U}$ such that $u_i = \mathcal{G}^{*}(a_i, f_i)$. Assuming a Lebesgue measure over the domain $D$, for a given pair of $(a_i, u_i, f_i)$, neural operators  $\mathcal{G}_{\theta}$ seek to approximate the true solution operator $\mathcal{G}^*$ by considering the following loss:
+\begin{equation} \label{eq:NOloss}
+    l_{\text{NO}}(a_i, f_i, u_i, \mathcal{G}_{\theta}) = \left\|u_i - \mathcal{G}_{\theta}(a_i, f_i)\right\|^2_{\mathcal{U}} = \int_{D} \left\|u_i(x) - \mathcal{G}_{\theta}(a_i, f_i)(x)\right\|_2^2dx
+\end{equation}
+
+The risk of this loss function is denoted by $\mathcal{R}_{\text{NO}}(\mathcal{G}_{\theta}) = \mathbb{E}_{(a, f) \sim \mu}\left[l_{\text{NO}}(a, f, \mathcal{G}^{*}(a, f), \mathcal{G}_{\theta})\right] = \mathbb{E}_{(a, f) \sim \mu}\left[l_{\text{NO}}(a, f, u, \mathcal{G}_{\theta})\right]$. Ideally, $\mathcal{G}_{\theta}$ would minimize $\mathcal{R}_{\text{NO}}(\mathcal{G}_{\theta})$.
+
+In classical PDE theory, if $L_a$ is a linear operator, the Green's function \autocite{stakgold2011greens} $G: D \times D \to \mathbb{R}^m$ is the solution for $L_aG(x, .) = \delta_x$ and the solution function takes the following form: $u(x)_j =\int_D G(x, y)_j f(y)_jdy$. Inspired by this, neural operators \autocite{kovachki2023neural} replace the traditional linear layer with a linear operator in the form of a kernel integral transform, $(\mathcal{K}v)(x) = \int_{D}\kappa(x, y)v(y)d\nu_t(y)$, mimicking the actions of Green's functions in a learnable way. 
+
+A single neural operator layer that maps a function $v_t: D \to \mathbb{R}^{d_t}$ to function $v_{t + 1}: D \to \mathbb{R}^{d_{t + 1}}$. This mapping takes the following form: $$v_{t + 1}(x) = \sigma_t\left(W_tv_t(x) + (\mathcal{K}_tv_t)(x) + b_t(x)\right)$$ for every $x \in D_{t + 1}$ where $W_t \in \mathbb{R}^{d_{t + 1} \times d_{t}}$ are matrices performing a local linear operation (discretization invariant), $\mathcal{K}_t: \{v_t: D \to \mathbb{R}^{d_{t + 1}}\} \to \{v_{t + 1}: D \to \mathbb{R}^{d_{t + 1}}\}$ are global kernel integral operators, $b_t: D \to \mathbb{R}^{d_{t + 1}}$ are bias functions which are often constant, and $\sigma_t$ is a fixed pointwise activation function mapping from $\mathbb{R}^{d_{t + 1}}$ to $\mathbb{R}^{d_{t + 1}}$.
+
+% The architecture of a neural operator is inspired by the behavior of a Green's function $G: D \times D \to \mathbb{R}^m$. If $L_a$ is a linear operator, the Green's function is the solution for $L_aG(x, .) = \delta_x$ and the solution function takes the following form: $u(x)_j =\int_D G(x, y)_j f(y)_jdy$.
+
+The architecture of the neural operator is discretization-invariant, a property that is clear in the parameterization of $W_t$ and $b_t$. However, a variety of discretization-invariant kernel parameterizations and kernel integral approximation strategies have given rise to many different variants of neural operators.  
+% Different variants of neural operators arise from the choice of kernel parameterization and the approximation strategy used to compute the integral. 
+For example, Fourier Neural Operators \autocite{li2020fourier} parameterize the kernel in the Fourier domain and use convolutions to characterize the integral. Graph Neural Operators \autocite{li2020multipole} compute the integral over a subdomain using the Nystrom's approximation. Prior to the rise of neural operators, DeepONets \autocite{lu2021learning} were a popular deep learning approach to operator learning. They can also be viewed a neural operator that uses a pointwise kernel with a discretized integral operator. 
+% But, a variety of discretization-invariant kernel parameterizations and approximations have led to many variants of neural operators.
+% In the kernel integration step, if we assume that $ D_t \equiv D_{t + 1} \equiv D$ and $\{x_1, \dots x_J\} \subset D$ are uniform samples from $D$, $(\mathcal{K}_tv_t)(x_j)$ is approximated by
+% $$\frac{1}{J}\sum_{l = 1}^J \kappa(x_j, x_l)v(x_l)$$. With this discretization, $K_t \in \mathbb{R}^{d_{t + 1}J \times d_{t}J}$ which is a $J \times J$ block matrix such that $K_{jl} = \kappa(x_j, x_l) \in \mathbb{R}^{d_{t + 1} \times d_t}$. This kernel intergration approximation step is $O(J^2d_{t + 1}d_t)$ which becomes quite intractable as $J$ becomes large. Various types of neural operators come from the different methods used to can approximate $\mathcal{K}_t$ derived based on structural assumptions made about the matrix. Since the computations involving $W_t, b, \sigma$ are $O(J)$, the focus of these types of neural operators has been to speed up the approximation of the kernel integration step.
+
+% Under some general conditions for $L_a$, we can define a Green's function $G: D \times D \to \mathbb{R}^m$ where $L_a G(x, .) = \delta_x $. If $u(x) = \int_D G(x, y) f(y)dy$, then
+
+% \begin{align*}
+%     (L_au)(x) &= \int_D (L_aG)(x, y) f(y)dy \\
+%     &= \int_D \delta_x f(y)dy \\ 
+%     &= f(x)
+% \end{align*}
+
+
+\subsection{Spectral Bias}
+
+Spectral bias \autocite{rahaman2019spectral}, also known as F-principle \autocite{xu2019frequency}, refers to the tendency of neural networks to learn low-frequency components of a function faster than high-frequency components during training. While the original authors for the spectral bias and F-principle primarily studied empirical manifestations of this phenomenon, theoretical work \autocite{luo2019theory} shows that networks with arbitrary number of layers and width initially have larger loss gradients for low-frequency components with respect to the Fourier basis, causing them to prioritize learning the smooth components of the true mapping. 
+
+Even in the Neural Tangent Kernel regime where networks are infinitely wide, spectral bias has been proven to persist \autocite{cao2019towards}. This has also been observed in neural operators \autocite{liu2021multiscale,liu2024mitigating,you2024mscalefno,khodakarami2025mitigating,xu2025understanding} where during early training, the model learns to output low-frequency parts of the output functions. A spectral decomposition of the loss described in \Cref{eq:NOloss} makes it easy to disentangle the errors associated with low- and high-frequency parts. Regardless of the exact $a$ and $f$, the solution space of this PDE takes on general form - $u(x) = \sum_{k}\widehat{u}(k) \phi_k(x)$ where $\{\phi_k(x)\}$ are the eigenfunctions of the Fourier basis and $\widehat{u}(k) = \left<u(x), \phi_k(x)\right> = \int_D u(x)\phi_k(x)dx$. These coefficients $\widehat{u}(k)$ vary with the different instantiations of $a$ and $f$. 
+
+Accordingly, $l_{\text{NO}}$ can be expressed in terms of the eigenfunction coefficients. Using the orthonormality of the eigenfunctions, we obtain:
+
+\begin{align*}
+    l_{\text{NO}}(a_i, f_i, u_i, \mathcal{G}_{\theta}) &= \int_{D} \left\|\sum_{k = 1}^{\infty}\widehat{u}(k) \phi_k(x) - \sum_{k = 1}^{\infty}\widehat{u}_{\theta}(k) \phi_k(x)\right\|_2^2dx \\
+    % &= \int_{D} \left\|\sum_{i = 1}^{\infty} \left(c_i -\widehat{c}_i \right)\phi_i(x)\right\|^2_2dx \\
+    &= \int_{D} \sum_{k = 1}^{\infty} \left(\widehat{u}(k) -\widehat{u}_{\theta}(k) \right)^2\|\phi_k(x)\|^2_2 + \sum_{j \neq k} \left(\widehat{u}(j) -\widehat{u}_{\theta}(j) \right)\left(\widehat{u}(j) -\widehat{u}_{\theta}(j) \right)\phi_k(x)^{\top}\phi_j(x)dx \\
+    % &=  \sum_{i = 1}^{\infty} \left(c_i -\widehat{c}_i \right)^2 \int_{D}\|\phi_i(x)\|^2_2dx + \sum_{j \neq i} \left(c_i -\widehat{c}_i \right)\left(c_j -\widehat{c}_j \right)^2 \int_{D}\phi_i(x)^{\top}\phi_j(x)dx \\
+    &= \sum_{k = 1}^{\infty} \left(\widehat{u}(k) -\widehat{u}_{\theta}(k) \right)^2
+\end{align*}
+
+
+% Assuming a Lebesgue measure over the domain $D$, neural operators  $\mathcal{G}_{\theta}$ aim to approximate the true solution operator $\mathcal{G}^*$ by minimizing the following loss:
+% \begin{align*}
+%     l_{\text{NO}}(a, \mathcal{G}_{\theta}, \mathcal{G}^*) = \left\|\mathcal{G}^*(a) - \mathcal{G}_{\theta}(a)\right\|^2_{\mathcal{U}} = \int_{D} \left|\mathcal{G}^*(a)(x) - \mathcal{G}_{\theta}(a)(x)\right|^2dx
+% \end{align*}
+% \begin{align*}
+%     \mathbb{E}_{a \sim \mathcal{P}}\left[\left\|\mathcal{G}^*(a) - \mathcal{G}_{\theta}(a)\right\|^2_{\mathcal{U}}\right] &= \int_{\mathcal{A}} \left\|\mathcal{G}^*(a) - \mathcal{G}_{\theta}(a)\right\|^2_{\mathcal{U}} d\mu(a) 
+% \end{align*}
+% where $\|f\|^2_{\mathcal{U}} = \int_{D} |f(x)|^2dx$
+
+% \subsection{Learning to Defer}
+
+
+\section{HINTS}
+
+To solve \Cref{eq:mainpde}, we can consider the following hybrid solver where:
+\begin{align*}
+    u^{\left(k + \frac{1}{2}\right)} &= u^{\left(k \right)} + B(f - \mathcal{L}_{\mathbf{x}}\left(u^{\left(k \right)}; a\right)) \quad \text{ $\tau$ iterations}\\
+    u^{\left(k + 1\right)} &= u^{\left(k + \frac{1}{2}\right)} + \mathcal{G}\left(f - \mathcal{L}_{\mathbf{x}}\left(u^{\left(k + \frac{1}{2}\right)}; a\right)\right)
+\end{align*}
+where the operator $B$ depends on the choice of the numerical iterative solver, such as Jacobi, Gauss-Seidel, or Multigrid. The errors in the hyrbid solver propagate in the following manner:
+\begin{equation}
+    e^{(k+1)} = \left(I - \mathcal{G} \mathcal{L}_{\mathbf{x}}\right)\left(I - B \mathcal{L}_{\mathbf{x}}\right)^{\tau}e^{(k)} \label{eq:errorhybrid}
+\end{equation}
+
+\subsection{Failure Modes of HINTS}
+
+Let $e^{(k)} = e^{(k)}_L + e^{(k)}_H$ where the low frequency error is defined as $e^{(k)}_L = \sum_{|i| < m} \left(\widehat{u}(i) - \widehat{u}^{(k)}(i)\right)^2$ and the high frequency as $e^{(k)}_H = \sum_{|i| \geq m} \left(\widehat{u}(i) - \widehat{u}^{(k)}(i)\right)^2$ denotes the high frequency errors. We choose an operator $B$ which contracts the high and low frequency components as follows: $e^{\left(k + \frac{1}{2}\right)}_H = 0.7e^{\left(k \right)}_H $ and $e^{\left(k + \frac{1}{2}\right)}_L = 0.8e^{\left(k \right)}_L $. Subsequently, a neural operator $\mathcal{G}$ is applied, which effectively targets the low frequecy parts: $e^{\left(k + 1\right)}_L = 0.5e^{\left(k + \frac{1}{2} \right)}_L $ and $e^{\left(k + 1\right)}_H = e^{\left(k + \frac{1}{2} \right)}_H $. The net result of this HINTS iteration is $e^{\left(k + 1\right)}_L = 0.4e^{\left(k  \right)}_L $ and $e^{\left(k + 1\right)}_H = 0.7e^{\left(k \right)}_H $.  While this approach ensures faster reduction in low-frequency error, the fixed contraction of high frequencies may dominate when only a limited number of iterations are allowed. This leads to non-uniform convergence, where high-frequency components decay slowly relative to the low-frequency ones. The optimal strategy would therefore adaptively allocate expert steps early on to high-frequency error reduction, and only later shift to neural updates focused on the low-frequency modes.
+
+
+
+\section{Spectral Analysis of HINTS}
+
+
+To solve \Cref{eq:mainpde}, we can consider the following hybrid solver where:
+\begin{align*}
+    u^{\left(k + \frac{1}{2}\right)} &= u^{\left(k \right)} + B(f - \mathcal{L}_{\mathbf{x}}\left(u^{\left(k \right)}; a\right)) \quad \text{ $\tau$ iterations}\\
+    u^{\left(k + 1\right)} &= u^{\left(k + \frac{1}{2}\right)} + \mathcal{G}\left(f - \mathcal{L}_{\mathbf{x}}\left(u^{\left(k + \frac{1}{2}\right)}; a\right)\right)
+\end{align*}
+where the operator $B$ depends on the choice of the numerical iterative solver, such as Jacobi, Gauss-Seidel, or Multigrid. The errors in the hyrbid solver propagate in the following manner:
+\begin{equation}
+    e^{(k+1)} = \left(I - \mathcal{G} \mathcal{L}_{\mathbf{x}}\right)\left(I - B \mathcal{L}_{\mathbf{x}}\right)^{\tau}e^{(k)} \label{eq:errorhybrid}
+\end{equation}
+
+
+Let $\mathcal{G}: \left\{D \to \mathbb{R}^u\right\} \to \left\{D \to \mathbb{R}^v\right\}$ be the Fourier linear operator such that:
+$$\left(\mathcal{G}u\right)(x) = Wu(x) + (\mathcal{K}u)(x) + b(x)$$
+where $(\mathcal{K}u)(x) =  \int_{D}K(x, y)u(y)dy$ is a kernel integral transform, and $K(x, y) = K(x - y): D \to \mathbb{R}^{v \times u}$ is translationally invariant. 
+
+To understand the behavior of this hybrid solver, we turn to Local Fourier Analysis (LFA) \cite{brandt1977multi}. LFA is a powerful tool for understanding how numerical solvers act on different frequency components of the error. By analyzing the behavior of the error propagation operator on a per-frequency basis, LFA reveals how efficiently a method damps errors across the spectrum. When the solution function is defined on an infinite uniform grid or a periodic domain, the error propagation operator is linear and stationary (i.e., it remains fixed across iterations), and the coefficient function $a \in \mathcal{A}$ is a constant, LFA can be applied directly. Under these conditions, the error propagation operator can be diagonalized in a fourier basis, enabling explicit computation of amplification factor each mode. 
+
+While the error propagation described in \Cref{eq:errorhybrid} is a linear operator, the domain might finite or non-period and the coefficient function may vary spatially. Nonetheless, LFA remains useful with variable coefficient functions through the freezing coefficients technique where one analyzes a family of locally constant-coefficient approximations of the original operator.  
+
+Let $h$ be a fixed grid size for an infinite 2 dimensional grid $G_h := \{\mathbf{x} = \mathbf{k}h = (k_1h, k_2h): \mathbf{k} \in \mathbb{Z}^2\}$. We can define a discrete linear operator on $G_h$, called $L_h$, which can be expressed in difference stencil notation as:
+\begin{align*}
+    L_h u_h(\mathbf{x}) = \sum_{\boldsymbol{\kappa} \in V} s_{h, \boldsymbol{\kappa}} u_h(\mathbf{x} + \boldsymbol{\kappa} h)
+\end{align*}
+where $J \subset \mathbb{Z}^2$ is a finite index set. For example, if $L_h$ is the discrete Laplacian operator or $-\Delta_h$, 
+\begin{align*}
+    L_h u_h(\mathbf{x}) = -\Delta_h u_h(\mathbf{x}) &= \frac{4}{h^2}u_h(x_1, x_2) - \frac{1}{h^2}u_h(x_1 - h, x_2) \\
+    &\quad - \frac{1}{h^2}u_h(x_1 + h, x_2) - \frac{1}{h^2}u_h(x_1, x_2 - h) - \frac{1}{h^2}u_h(x_1, x_2 + h)
+\end{align*}
+% $$L_h u_h(x) = -\Delta_h u_h(x) = \frac{4}{h^2}u_h(x_1, x_2) - \frac{1}{h^2}u_h(x_1 - h, x_2) - \frac{1}{h^2}u_h(x_1 + h, x_2) - \frac{1}{h^2}u_h(x_1, x_2 - h) - \frac{1}{h^2}u_h(x_1, x_2 + h)$$ 
+
+Let $\phi_h(\boldsymbol{\theta}, \mathbf{x})$ be a grid function on $G_h$ defined as
+\begin{equation}
+    \phi_h(\boldsymbol{\theta}, \mathbf{x}) = e^{\frac{i}{h}\left(\theta_1x_1 + \theta_2x_2\right)} \label{eq:discretefourierbasis}
+\end{equation}
+
+While $\boldsymbol{\theta} \in \mathbb{R}^2$, we can leverage the property $\phi(\boldsymbol{\theta}, \mathbf{x}) = \phi(\boldsymbol{\theta} (\mod 2\pi), \mathbf{x})$  for any $x \in G_h$ to only consider $\boldsymbol{\theta} \in [-\pi, \pi)^2$ . The following lemma is key in performing Local Fourier Analysis
+\begin{lemma} \label{th:eigendecomposition}
+    For all $\boldsymbol{\theta} \in [-\pi, \pi)^2$, $\phi(\boldsymbol{\theta}, \mathbf{x})$ are eigenfunctions of any discrete operator $L_h$ defined by a difference stencil.
+    Formally,
+    \begin{align*}
+        L_h \phi(\boldsymbol{\theta}, \mathbf{x}) = \Tilde{L}_h(\boldsymbol{\theta}) \phi(\boldsymbol{\theta}, \mathbf{x})
+    \end{align*}
+    where $\Tilde{L}_h(\boldsymbol{\theta}) = \sum_{\boldsymbol{\kappa} \in V} s_{h, \boldsymbol{\kappa}} e^{i\boldsymbol{\theta}\cdot \boldsymbol{\kappa}}$ is the eigenvalue of the symbol of $L_h$
+\end{lemma}
+
+% Furthermore, function $u$ can be decomposed in terms of the fourier bases:
+
+% \begin{align*}
+%     u(\mathbf{x}) = \int_{\boldsymbol{\theta} \in [-\pi, \pi]^2}  \widehat{u}(\boldsymbol{\theta})\phi(\boldsymbol{\theta},\mathbf{x})d\boldsymbol{\theta}
+% \end{align*}
+%  where $\widehat{u}(\boldsymbol{\theta}) = \sum_{\mathbf{x}} hu(\mathbf{x})e^{-\frac{i}{h}\left(\theta_1x_1 + \theta_2x_2\right)}$.
+
+Since the fourier linear operator $\mathcal{G}$ can be expressed using a difference stencil, we can analyze it similarly using LFA:
+\begin{theorem} \label{th:lfaflo}
+    Let $e^{(k)} = u^{(k)} - u$ denote the errors at the $k^{th}$ iteration and let $\widehat{e}^{(k)}(\boldsymbol{\theta})$ denote the representation of the error in the frequency domain. If the bias is $0$ constant function, the amplification factor of the error in the frequency domain between the $k + \frac{1}{2}$ step and $k + 1$ step is given by $\Tilde{M}_{h}(\boldsymbol{\theta})$ such that
+    $$\widehat{e}^{(k + 1)}(\boldsymbol{\theta}) = \Tilde{M}_{\text{FLO}}(\boldsymbol{\theta})\widehat{e}^{\left(k + \frac{1}{2}\right)}(\boldsymbol{\theta})$$
+    where $\Tilde{M}_{\text{FLO}}(\boldsymbol{\theta}) = 1 - (W + \Tilde{\mathcal{K}}(\boldsymbol{\theta}))\Tilde{L}_h(\boldsymbol{\theta})$ and $\Tilde{L}_h(\boldsymbol{\theta})$ is the fourier symbol of $L_h$
+\end{theorem}
+The proof of \Cref{th:lfaflo} can be found in \Cref{sec:lfahybridsolver}. Now, if the operator $B$ on $G_h$ can also be diagonalized in the fourier basis, then the amplification factors of each frequency at each step of the hybrid solver can be analyzed by LFA:
+\begin{corollary} \label{th:lfahybrid}
+    If $B_h$ can be expressed in difference stencil notation, the amplification factor of the error in the frequency domain after one step of HINTS is given by $\Tilde{M}_{h}(\boldsymbol{\theta})$ such that
+    $$\widehat{e}^{(k + 1)}(\boldsymbol{\theta}) = \Tilde{M}_{h}(\boldsymbol{\theta})\widehat{e}^{\left(k\right)}(\boldsymbol{\theta})$$
+    where $\Tilde{M}_{h}(\boldsymbol{\theta}) = \Tilde{M}_{\text{FLO}}(\boldsymbol{\theta})\left(1 - \Tilde{B}_{h}(\boldsymbol{\theta})\Tilde{L}_h(\boldsymbol{\theta})\right)^{\tau}$and $\Tilde{B}_{h}(\boldsymbol{\theta})$ is the fourier symbol of $B_h$
+\end{corollary}
+
+Both Jacobi and Gauss-Seidel methods yield error propagation operators that are diagonalizable in the fourier basis. However, multigrid methods introduce frequency mixing, meaning that error components are mapped across frequencies. Fortunately, this mixing is typically confined to a harmonic subspace. For example, in two-grid V-cycles, the frequency mixing is restricted to thie four-dimnesional subspace -- $E^{\boldsymbol{\theta}}_h = \text{span} \left\{\phi_h(\boldsymbol{\theta}^{\alpha_1\alpha_2}, \mathbf{x}): \alpha_1 , \alpha_2 \in \{0, 1\}\right\}$ where $\boldsymbol{\theta}^{\alpha_1\alpha_2} = \boldsymbol{\theta}^{00} - \left(\alpha_1 \sign (\theta_1), \alpha_2 \sign (\theta_2)\right)\pi$ for $\alpha_1, \alpha_2 \in \{0, 1\}$. This structure enables block-wise analysis of multigrid convergence within these harmonic subspaces. A detailed explanation of this phenomenon and a corollary similar to \Cref{th:lfahybrid} for two grid operator can be found in \Cref{sec:lfa2grid}. 
+
+\subsection{Motivating example: Poisson Equation}
+
+Let's consider the Poisson equation. In the case of Jacobi solver, the amplification factor $1 - \Tilde{B}_{h}(\boldsymbol{\theta})\Tilde{L}_h(\boldsymbol{\theta}) < 1$ for all $\boldsymbol{\theta} \in [-\pi, \pi)^2 \backslash [-\pi/2, \pi/2)^2$ which implies that frequencies are amplified with every iteration for $\boldsymbol{\theta} \in [-\pi/2, \pi/2)^2$. However, if the amplification factor of the fourier linear operator $1 - (W + \Tilde{\mathcal{K}}(\boldsymbol{\theta}))\Tilde{L}_h(\boldsymbol{\theta}) < 1$ where the damping is poor, the high frequencies introduced as a result of the Jacobi solver can be damped by the fourier linear operator. This can result in the error frequencies staying the same if the effects of the fourier linear operator and the jacobi solver counteract one and other. 
+
+
+% \section{Methodology}
+
+
+% \subsection{Router for Pre-trained Models}
+
+
+
+
+
+
+\section{Discussion (Informal)}
+
+\subsection{Initial plan for Method:}
+
+We can divide the frequency domain into some finite frequency bands and understand how the various multigrid solvers and neural operator amplify/damp errors across all these bands. At each iterate, we can have a model that predicts what the current state of the errors are in each frequency band and then route the solution function to the appropriate solver depending on the which frequency band performs the worst. This is a Greedy approach to this. I have identified the following issues with this method:
+\begin{itemize}
+    \item Local fourier analysis for general neural operators is very tricky. I don't have analysis for this yet but feeding a band-limited functions into a relu will introduce many new high frequency and leads to a lot of uncontrollable frequency mixing, making it very difficult to analyze the impact of the frequencies of the previous iterate and the current iterate. For example, from \Cref{th:lfahybrid}, it is clear that that the amplitudes of each frequency component evolves independently--that is, the amplificaton of a given frequency depends only on its own amplitude and is unaffected by other frequencies. This property makes it very easy to make greedy decisions - send the problem to the solver with the lowest amplification factor for the worst-performing frequency band. 
+    \item Even if the dynamics of each solver is analyzed in the frequency domain, it remains unclear whether a greedy strategy--one that targets the worst-performing frequency band--will effective. In fact, such an approach may result in a whack-a-mole effect where damping the worst-performing frequency band inadvertently amplifies another band.
+\end{itemize}
+
+\subsection{Ambitious method}
+
+If feasibility wasn't a concern, at each iteration, the solver could decompose the function into the fourier domain and selectively apply the neural operator to certain frequency bands while using the classical numerical solver on the others. This would allow us to fully exploit the complementary strenghts of each solver without worrying about their adverse effects on poorly performing frequencies.
+
+
+
+
+\subsection{Ways to increase scope of this problem}
+
+% Once the points of confusion in \Cref{sec:confusions} are addressed and
+
+if the scope of the problem still feels limited, the following enhancements can be made to the methodology to increase the scope:
+
+\paragraph{Adaptive Mesh Refinement:} Many iterative methods consider an uniform discretization throughout the domain $D$. Similarly, multigrid methods consider the same cycle (pattern and levels of discretization) for the entire domain. However, certain parts of the domain may require finer resolution or more levels of discretization. In this case, the router can assign different parts of the domain to different experts at every timestep. 
+
+\paragraph{Adaptive Cycle Patterns:} Oftentimes, in multigrid methods, the cycles follow a fixed cycle pattern, i.e. V cycle, W cycle, or F -cycle patterns. However, these patterns may inefficiently squash high and low frequency errors. It's possible that more iterations in coarser grid is needed due to the large low frequency errors. It could be useful to have cycle patterns be problem-specific and change according to the error spectrum. To allow adaptivity of cycle patterns, we can have a local router guiding the multigrid method and deciding whether to remain in the same grid level, increase coarseness of the grid , or move to a finer grid. Additionally, we can have a meta-router making a binary decision to call a multigrid solver or a neural operator. 
+
+\paragraph{Multiple Neural Operators:} We can consider the classic model routing problem where there is a group of Neural operators -- DeepONets, Fourier Neural Operators, Graph Neural Operators, etc -- and the router choose either one of the neural operators or one of the iterative solvers. This is a fairly simple addition to make as it boils down to adding more labels to the router decision space. 
+
+
+% \section{Experimental Setup}
+
+\printbibliography
+
+
+\appendix
+
+% \section{Theoretical Analysis of Jacobi} \label{sec:jacobianalysis}
+
+% $A$ is split into $A = D - L - U$ where $D$ is the Diagnonal parts of $A$, $U$ is the additive inverse of the upper triangle parts of $A$, and $L$ is the additive inverse of the lower triangle parts of $A$ (See \href{https://ocw.mit.edu/courses/16-920j-numerical-methods-for-partial-differential-equations-sma-5212-spring-2003/resources/lec6_notes/}{here} and \href{https://math.mit.edu/classes/18.086/2006/am62.pdf}{here} for references). Then, $(D - L - U)x = b$ or $Dx = (L + U)x + b$ which inspires the following update rule $x^{(j + 1)} = D^{-1}\left((L + U)x^{(j)} + b\right)$. Let $e^{(j)}$ be the iteration error or $x^{(j)} - x$. Then, $e^{(j + 1)} = D^{-1}(L + U)e^{(j)} = M_{Jac}e^{(j)}$. Generally, $e^{(j + 1)} = M_{Jac}^{j}e^{(1)}$
+
+
+
+\section{Local Fourier Analysis}
+
+\subsection{Local Fourier Analysis for Hybrid Solver} \label{sec:lfahybridsolver}
+
+\begin{lemma}
+    Let $e^{k} = u^k - u$ denote the errors at the $k^{th}$ iteration and let $\widehat{e}^{(k)}(\boldsymbol{\theta})$ denote the representation of the error in the frequency domain. If the bias is $0$ constant function, The amplification factor of the error in the frequency domain is given by $\Tilde{M}_{h}(\boldsymbol{\theta})$ such that
+    $$\widehat{e}^{(k + 1)}(\boldsymbol{\theta}) = \Tilde{M}_{h}(\boldsymbol{\theta})\widehat{e}^{\left(k + \frac{1}{2}\right)}(\boldsymbol{\theta})$$
+    where $\Tilde{M}_{h}(\boldsymbol{\theta}) = 1 - (W + \Tilde{\mathcal{K}}(\boldsymbol{\theta}))\Tilde{L}_h(\boldsymbol{\theta})$
+\end{lemma}
+
+\begin{proof}
+    The error propagation operator for a Fourier linear operator can be described as $M_{FLO} = I - \mathcal{G}\mathcal{L}_h$. Since $L_h$ can be expressed in difference stencil notation,  $L_h \phi(\boldsymbol{\theta}, \mathbf{x}) = \Tilde{L}_h(\boldsymbol{\theta})\phi(\boldsymbol{\theta}, \mathbf{x})$ by Lemma \ref{th:eigendecomposition}. Applying the local $W$ matrix to the error can be characterized by a $1 \times 1$ difference stencil which results in $W$ being the symbol of the local operator. Due to the translational invariance of the kernel, the kernel integral transform on an infinite discrete grid can be written as  $(\mathcal{K}u)(x) =  \sum_{y \in G_h}hK(x - y)u(y) = \sum_{\boldsymbol{\kappa} \in \mathbb{Z}^2}hK(-\boldsymbol{\kappa}h)u(\mathbf{x} + \boldsymbol{\kappa}h)$ which corresponds to a discrete operator by a difference stencil. We can, therefore, invoke Lemma \ref{th:eigendecomposition} for the kernel discrete operator. Then $e^{(k + 1)}_h(\mathbf{x})$ can be expressed as, 
+    \begin{align*}
+        e^{(k + 1)}_h(\mathbf{x}) &= \left(M_{FLO} e^{\left(k + \frac{1}{2}\right)}_h\right)(\mathbf{x}) \\
+        &= M_{FLO} \int_{\boldsymbol{\theta} \in [-\pi, \pi]^2}  \widehat{e}^{\left(k + \frac{1}{2}\right)}(\boldsymbol{\theta})\phi(\boldsymbol{\theta},\mathbf{x})d\boldsymbol{\theta} \\
+        &= \int_{\boldsymbol{\theta} \in [-\pi, \pi]^2}  \widehat{e}^{\left(k + \frac{1}{2}\right)}(\boldsymbol{\theta}) M_{FLO} \phi(\boldsymbol{\theta},\mathbf{x})d\boldsymbol{\theta} \\
+        &= \int_{\boldsymbol{\theta} \in [-\pi, \pi]^2}  \widehat{e}^{\left(k + \frac{1}{2}\right)}(\boldsymbol{\theta}) \left(1 - (W + \Tilde{\mathcal{K}}(\boldsymbol{\theta}))\Tilde{L}_h(\boldsymbol{\theta})\right) \phi(\boldsymbol{\theta},\mathbf{x})d\boldsymbol{\theta}
+    \end{align*}
+    Therefore, $\widehat{e}^{(k + 1)}(\boldsymbol{\theta}) = \Tilde{M}_{h}(\boldsymbol{\theta})\widehat{e}^{\left(k + \frac{1}{2}\right)}(\boldsymbol{\theta})$ where $\Tilde{M}_{h}(\boldsymbol{\theta}) = 1 - (W + \Tilde{\mathcal{K}}(\boldsymbol{\theta}))\Tilde{L}_h(\boldsymbol{\theta})$
+\end{proof}
+
+
+\subsection{Local Fourier Analysis of 2 grid operator} \label{sec:lfa2grid}
+
+
+
+When considering a coarse infinite grid $G_H$ of grid size $H = 2h$, we further restrict the domain of $\phi(\boldsymbol{\theta}, \mathbf{x})$ to $\left[\frac{-\pi}{2}, \frac{\pi}{2}\right)^2$ since for each $\boldsymbol{\theta}' \in \left[\frac{-\pi}{2}, \frac{\pi}{2}\right)^2$, three other frequency components $\phi(\boldsymbol{\theta}, \mathbf{x})$ aliases with $\phi(\boldsymbol{\theta}', \mathbf{x})$ for  $ \mathbf{x} \in G_H$. 
+\begin{lemma} \label{th:aliasing}
+    For $\mathbf{x} \in G_{2h}$ and $\boldsymbol{\theta}^{00} \in \left[\frac{-\pi}{2}, \frac{\pi}{2}\right)^2$,
+    \begin{align*}
+        \phi_h(\boldsymbol{\theta}^{\alpha_1\alpha_2}, \mathbf{x}) &= \phi_h(\boldsymbol{\theta}^{00}, \mathbf{x}) \\
+        \phi_{h}(\boldsymbol{\theta}^{\alpha_1\alpha_2}, \mathbf{x}) &= \phi_{2h}(2\boldsymbol{\theta}^{00}, \mathbf{x})
+    \end{align*}
+    where $\boldsymbol{\theta}^{\alpha_1\alpha_2} = \boldsymbol{\theta}^{00} - \left(\alpha_1 \sign (\theta_1), \alpha_2 \sign (\theta_2)\right)\pi$ for $\alpha_1, \alpha_2 \in \{0, 1\}$. 
+\end{lemma}
+
+\begin{proof}
+\begin{align*}
+     \phi_h(\boldsymbol{\theta}^{\alpha_1\alpha_2}, \mathbf{x}) &= e^{\frac{i}{h}\left(\theta_1x_1 + \theta_2x_2 - \alpha_1 \sign (\theta_1)\pi x_1 - \alpha_2 \sign (\theta_2)\pi x_2\right)} \\
+     &= \phi_h(\boldsymbol{\theta}^{00}, \mathbf{x})e^{\frac{-i}{h}\left(\alpha_1 \sign (\theta_1)\pi x_1\right)}e^{\frac{-i}{h}\left( \alpha_2 \sign (\theta_2)\pi x_2\right)}
+\end{align*}
+
+$\mathbf{x} \in G_{2h}$ can be written as $2\mathbf{x}'$ where $\mathbf{x}' \in G_h$ and so,
+\begin{align*}
+     \phi_h(\boldsymbol{\theta}^{\alpha_1\alpha_2}, \mathbf{x}) &= \phi_h(\boldsymbol{\theta}^{00}, \mathbf{x})e^{\frac{-i}{h}\left(\alpha_1 \sign (\theta_1)2\pi x_1'\right)}e^{\frac{-i}{h}\left( \alpha_2 \sign (\theta_2)2\pi x_2'\right)} \\
+     &= \phi_h(\boldsymbol{\theta}^{00}, \mathbf{x})\left(e^{2\pi i}\right)^{\alpha_1 \sign (\theta_1)\frac{x_1'}{h}}\left(e^{2\pi i}\right)^{\alpha_2 \sign (\theta_2)\frac{x_2'}{h}} \\
+     &=  \phi_h(\boldsymbol{\theta}^{00}, \mathbf{x}) \quad \text{since $e^{2\pi i} = 1$ and $x_1'/h, x_2'/h \in \mathbb{Z}$}
+\end{align*}
+
+And,
+\begin{align*}
+    \phi_{2h}(2\boldsymbol{\theta}^{00}, \mathbf{x}) &= e^{\frac{i}{2h}\left(2\theta_1x_1 + 2\theta_2x_2\right)} \\
+    &= e^{\frac{i}{h}\left(\theta_1x_1 + \theta_2x_2\right)} = \phi_h(\boldsymbol{\theta}^{00}, \mathbf{x}) 
+\end{align*}
+   
+\end{proof}
+% Specifically,  $\phi(\boldsymbol{\theta}^{\alpha_1\alpha_2}, \mathbf{x}) = \phi(\boldsymbol{\theta}^{00}, \mathbf{x})$ for $\boldsymbol{\theta}^{00} \in \left[\frac{-\pi}{2}, \frac{\pi}{2}\right)^2$, $\boldsymbol{x} \in G_h$, and  $\alpha_1, \alpha_2 \in \{0, 1\}$ where $\boldsymbol{\theta}^{\alpha_1\alpha_2} = \boldsymbol{\theta}^{00} - \left(\alpha_1 \sign (\theta_1), \alpha_2 \sign (\theta_2)\right)\pi$. 
+
+
+
+
+$\boldsymbol{\theta}^{00}$ is considered low frequency and $\boldsymbol{\theta}^{01}, \boldsymbol{\theta}^{10}, \boldsymbol{\theta}^{11}$ are high frequency. For $\boldsymbol{\theta} \in \left[\frac{-\pi}{2}, \frac{\pi}{2}\right)^2$, we define the following space of harmonics as:
+\begin{align*}
+    E^{\boldsymbol{\theta}}_h = \text{span} \left\{\phi_h(\boldsymbol{\theta}^{\alpha_1\alpha_2}, \mathbf{x}): \alpha_1 , \alpha_2 \in \{0, 1\}\right\}
+\end{align*}
+
+
+
+Let the two grid error propagation operator be $M^{H}_h = S^{\nu_2}K^H_hS^{\nu_2}$ where $K^H_h = I - I^{h}_{2h}L_{2h}^{-1}I^{2h}_hL_h$. Analyzing how $M^H_h$ acts on the error function provided insight into how different frequency components are either damped or amplified in a two-gird V-cycle. \Cref{th:lfatwogrid} leverages the invariance of  $E^{\boldsymbol{\theta}}_h$ under $K^H_h$ to provide an explicit expression for how the fourier coefficients are transformed. 
+
+\begin{theorem} \label{th:lfatwogrid}
+    If  $\psi \in E^{\boldsymbol{\theta}}_h$ or $\psi(\mathbf{x})= A^{00}\phi_h(\boldsymbol{\theta}^{00}, \mathbf{x}) + A^{01}\phi_h(\boldsymbol{\theta}^{01}, \mathbf{x}) + A^{10}\phi_h(\boldsymbol{\theta}^{10}, \mathbf{x}) + A^{11}\phi_h(\boldsymbol{\theta}^{11}, \mathbf{x})$, then $K^H_h \psi \in E^{\boldsymbol{\theta}}_h$ and $\psi(\mathbf{x})= \Tilde{A}^{00}\phi_h(\boldsymbol{\theta}^{00}, \mathbf{x}) + \Tilde{A}^{01}\phi_h(\boldsymbol{\theta}^{01}, \mathbf{x}) + \Tilde{A}^{10}\phi_h(\boldsymbol{\theta}^{10}, \mathbf{x}) + \Tilde{A}^{11}\phi_h(\boldsymbol{\theta}^{11}, \mathbf{x})$ such that
+    \begin{align*}
+        \begin{bmatrix}
+            \Tilde{A}^{00} \\
+            \Tilde{A}^{01} \\
+            \Tilde{A}^{10} \\
+            \Tilde{A}^{11}
+        \end{bmatrix} = \left(I_4 - \widehat{I}^h_{2h}\left(\boldsymbol{\theta}\right)\left(\widehat{L}_{2h}\left(\boldsymbol{\theta}\right)\right)^{-1}\widehat{I}^{2h}_h\left(\boldsymbol{\theta}\right)\widehat{L}_h\left(\boldsymbol{\theta}\right)\right)\begin{bmatrix}
+            A^{00} \\
+            A^{01} \\
+            A^{10} \\
+            A^{11}
+        \end{bmatrix}
+    \end{align*}
+    % Here, $\widehat{K}^H_h\left(\boldsymbol{\theta}\right) = I_4 - \widehat{I}^h_{2h}\left(\boldsymbol{\theta}\right)\left(\widehat{L}_{2h}\left(\boldsymbol{\theta}\right)\right)^{-1}\widehat{I}^{2h}_h\left(\boldsymbol{\theta}\right)\widehat{L}_h\left(\boldsymbol{\theta}\right)$ 
+    where 
+    \begin{align*}
+    \widehat{I}^h_{2h}\left(\boldsymbol{\theta}\right) &= [\Tilde{I}^h_{2h}\left(\boldsymbol{\theta}^{00}\right), \Tilde{I}^h_{2h}\left(\boldsymbol{\theta}^{01}\right), \Tilde{I}^h_{2h}\left(\boldsymbol{\theta}^{10}\right), \Tilde{I}^h_{2h}\left(\boldsymbol{\theta}^{11}\right)]^{\top} \in \mathbb{C}^{1 \times 4} \\
+    \widehat{L}_{2h}\left(\boldsymbol{\theta}\right) &= \Tilde{L}_{2h}\left(\boldsymbol{\theta^{00}}\right) \in \mathbb{C} \\
+    \widehat{I}_h^{2h}\left(\boldsymbol{\theta}\right) &= [\Tilde{I}_h^{2h}\left(\boldsymbol{\theta}^{00}\right), \Tilde{I}_h^{2h}\left(\boldsymbol{\theta}^{01}\right), \Tilde{I}_h^{2h}\left(\boldsymbol{\theta}^{10}\right), \Tilde{I}_h^{2h}\left(\boldsymbol{\theta}^{11}\right)] \in \mathbb{C}^{1 \times 4} \\
+    \widehat{L}_h\left(\boldsymbol{\theta}\right) &= \text{diag} \left(\Tilde{L}_h\left(\boldsymbol{\theta}^{00}\right), \Tilde{L}_h\left(\boldsymbol{\theta}^{01}\right), \Tilde{L}_h\left(\boldsymbol{\theta}^{10}\right), \Tilde{L}_h\left(\boldsymbol{\theta}^{11}\right)\right) \in \mathbb{C}^{4 \times 4}
+    \end{align*}
+    In other words, $E^{\boldsymbol{\theta}}_h$ is invariant under the $K^H_h$ operator
+\end{theorem}
+
+\begin{proof}
+    To prove the invariance of $E^{\boldsymbol{\theta}}_h$ under the $K^H_h$ operator, we must show that $E^{\boldsymbol{\theta}}_h$ is invariant under each component of $K^H_h$. Furthermore, we can also show how the coefficients of the bases of $E^{\boldsymbol{\theta}}_h$ transform through $I^{h}_{2h}, L_{2h}^{-1}, I^{2h}_h, L_h$. 
+    \begin{enumerate}
+        \item $L_h$ operator: When $L_h : E^{\boldsymbol{\theta}}_h \to E^{\boldsymbol{\theta}}_h$ discrete operator is applied to $\psi \in E^{\boldsymbol{\theta}}_h$, 
+\begin{align*}
+    L_h \psi(\mathbf{x}) &= L_h \left(A^{00}\phi_h(\boldsymbol{\theta}^{00}, \mathbf{x}) + A^{01}\phi_h(\boldsymbol{\theta}^{01}, \mathbf{x}) + A^{10}\phi_h(\boldsymbol{\theta}^{10}, \mathbf{x}) + A^{11}\phi_h(\boldsymbol{\theta}^{11}, \mathbf{x})\right) \\
+    &= A^{00} L_h \phi_h(\boldsymbol{\theta}^{00}, \mathbf{x}) + A^{01}L_h \phi_h(\boldsymbol{\theta}^{01}, \mathbf{x}) + A^{10}L_h \phi_h(\boldsymbol{\theta}^{10}, \mathbf{x}) + A^{11}L_h \phi_h(\boldsymbol{\theta}^{11}, \mathbf{x}) \\
+    &= A^{00} \Tilde{L}_h(\boldsymbol{\theta}^{00}) \phi_h(\boldsymbol{\theta}^{00}, \mathbf{x}) +  A^{01}\Tilde{L}_h(\boldsymbol{\theta}^{01}) \phi_h(\boldsymbol{\theta}^{01}, \mathbf{x}) \\
+    &\quad + A^{10}\Tilde{L}_h(\boldsymbol{\theta}^{10}) \phi_h(\boldsymbol{\theta}^{10}, \mathbf{x}) + A^{11}\Tilde{L}_h(\boldsymbol{\theta}^{11}) \phi_h(\boldsymbol{\theta}^{11}, \mathbf{x}) \\
+    &= \begin{bmatrix}
+        \phi_h(\boldsymbol{\theta}^{00}, \mathbf{x})\\
+        \phi_h(\boldsymbol{\theta}^{01}, \mathbf{x})\\
+        \phi_h(\boldsymbol{\theta}^{10}, \mathbf{x})\\
+        \phi_h(\boldsymbol{\theta}^{11}, \mathbf{x})
+    \end{bmatrix}^{\top} \widehat{L}_h(\boldsymbol{\theta}) \begin{bmatrix}
+        A^{00}\\
+        A^{01}\\
+        A^{10}\\
+        A^{11}
+    \end{bmatrix}
+\end{align*}
+where $ \widehat{L}_h(\boldsymbol{\theta}) = \begin{bmatrix}
+        \Tilde{L}_h(\boldsymbol{\theta}^{00}) & & &\\
+        & \Tilde{L}_h(\boldsymbol{\theta}^{01}) & & \\
+        & & \Tilde{L}_h(\boldsymbol{\theta}^{10}) & \\
+        & & &\Tilde{L}_h(\boldsymbol{\theta}^{00})
+    \end{bmatrix} $
+    \item $I^{2h}_h$ restriction operator: The restriction operator can be viewed as a discrete operator with a difference stencil. For example, injection is an operator with $[1]$ stencil and full weighting has $\frac{1}{16} \begin{bmatrix}
+    1 & 2 & 1\\
+    2 & 4 & 2\\
+    1 & 2 & 1
+\end{bmatrix}$. This operator maps functions from $E^{\boldsymbol{\theta}}_h \to \text{span}\left\{\phi_{2h}(2\boldsymbol{\theta}^{00}, \mathbf{x})\right\}$
+
+\begin{align*}
+    I^{2h}_h \psi(\mathbf{x}) &= I^{2h}_h (A^{00} \phi_h(\boldsymbol{\theta}^{00}, \mathbf{x}) +  A^{01} \phi_h(\boldsymbol{\theta}^{01}, \mathbf{x}) + A^{10} \phi_h(\boldsymbol{\theta}^{10}, \mathbf{x}) + A^{11} \phi_h(\boldsymbol{\theta}^{11}, \mathbf{x})) \\
+    &= \Tilde{I}_h^{2h}(\boldsymbol{\theta}^{00})A^{00} \phi_h(\boldsymbol{\theta}^{00}, \mathbf{x}) +  \Tilde{I}_h^{2h}(\boldsymbol{\theta}^{01})A^{01}\phi_h(\boldsymbol{\theta}^{01}, \mathbf{x}) \\
+    &\quad+ \Tilde{I}_h^{2h}(\boldsymbol{\theta}^{10})A^{10}\phi_h(\boldsymbol{\theta}^{10}, \mathbf{x}) + \Tilde{I}_h^{2h}(\boldsymbol{\theta}^{11})A^{11}\phi_h(\boldsymbol{\theta}^{11}, \mathbf{x})
+\end{align*}
+
+The restriction operator maps the grid function to $G_{2h}$ and so, the high frequencies are not visible on that grid and they all alias as $\phi_{2h}(2\boldsymbol{\theta}^{00}, \mathbf{x})$ (Lemma \ref{th:aliasing})
+
+\begin{align*}
+    I^{2h}_h \psi(\mathbf{x}) &= \left(\Tilde{I}_h^{2h}(\boldsymbol{\theta}^{00})A^{00}   +  \Tilde{I}_h^{2h}(\boldsymbol{\theta}^{01})A^{01} + \Tilde{I}_h^{2h}(\boldsymbol{\theta}^{10})A^{10} + \Tilde{I}_h^{2h}(\boldsymbol{\theta}^{11})A^{11} \right) \phi_{2h}(2\boldsymbol{\theta}^{00}, \mathbf{x}) \\
+    &= \widehat{I}^{2h}_h(\boldsymbol{\theta}) \begin{bmatrix}
+        A^{00}\\
+        A^{01}\\
+        A^{10}\\
+        A^{11}
+    \end{bmatrix} \phi_{2h}(2\boldsymbol{\theta}^{00}, \mathbf{x})
+\end{align*}
+ where $\widehat{I}^{2h}_h(\boldsymbol{\theta}) = \begin{bmatrix}
+     \Tilde{I}_h^{2h}(\boldsymbol{\theta}^{00}) & \Tilde{I}_h^{2h}(\boldsymbol{\theta}^{01}) & \Tilde{I}_h^{2h}(\boldsymbol{\theta}^{10}) & \Tilde{I}_h^{2h}(\boldsymbol{\theta}^{11})
+ \end{bmatrix}$
+    \item $L_{2h}^{-1}$ on $G_{2h}$: The inverse of the forward operator on $G_{2h}$ is $L_{2h}^{-1}: \text{span}\left\{\phi_{2h}(2\boldsymbol{\theta}^{00}, \mathbf{x})\right\}\to \text{span}\left\{\phi_{2h}(2\boldsymbol{\theta}^{00}, \mathbf{x})\right\}$. So, for some $\psi' \in  \text{span}\left\{\phi_{2h}(2\boldsymbol{\theta}^{00}, \mathbf{x})\right\} $ 
+
+\begin{align*}
+    L_{2h}^{-1} \psi' &= L_{2h}^{-1}A \phi_{2h}(2\boldsymbol{\theta}^{00}, \mathbf{x}) \\
+    &= A \Tilde{L}_{2h}^{-1}(2\boldsymbol{\theta}^{00})\phi_{2h}(2\boldsymbol{\theta}^{00}, \mathbf{x})
+\end{align*}
+
+    \item $I^h_{2h}$: The interpolation operator $I^h_{2h}: \text{span}\left\{\phi_{2h}(2\boldsymbol{\theta}^{00}, \mathbf{x})\right\} \to E^{\boldsymbol{\theta}}_h $ maps grid functions from $G_{2h}$ to $G_h$.
+$$I^h_{2h} \psi' = \begin{bmatrix}
+        \phi_h(\boldsymbol{\theta}^{00}, \mathbf{x})\\
+        \phi_h(\boldsymbol{\theta}^{01}, \mathbf{x})\\
+        \phi_h(\boldsymbol{\theta}^{10}, \mathbf{x})\\
+        \phi_h(\boldsymbol{\theta}^{11}, \mathbf{x})
+    \end{bmatrix}^{\top}\widehat{I}^h_{2h}\left(\boldsymbol{\theta}\right)A $$
+
+where $\widehat{I}^h_{2h}\left(\boldsymbol{\theta}\right) = \frac{1}{4}\begin{bmatrix}
+    \Tilde{I}_{2h}^{h}(\boldsymbol{\theta}^{00}) & \Tilde{I}_{2h}^{h}(\boldsymbol{\theta}^{01}) & \Tilde{I}_{2h}^{h}(\boldsymbol{\theta}^{10}) & \Tilde{I}_{2h}^{h}(\boldsymbol{\theta}^{11})
+\end{bmatrix}$
+    \end{enumerate}
+\end{proof}
+
+Let $\widehat{K}^H_h\left(\boldsymbol{\theta}\right) = \left(I_4 - \widehat{I}^h_{2h}\left(\boldsymbol{\theta}\right)\left(\widehat{L}_{2h}\left(\boldsymbol{\theta}\right)\right)^{-1}\widehat{I}^{2h}_h\left(\boldsymbol{\theta}\right)\widehat{L}_h\left(\boldsymbol{\theta}\right)\right)$
+
+\begin{corollary}
+    If $E^{\boldsymbol{\theta}}_h$ is invariant under the smoothing operator $S$ is also invariant, then $E^{\boldsymbol{\theta}}_h$ is invariant under the two grid operator $M^H_h$. In particular, 
+    \begin{align*}
+        M^H_h \psi(\mathbf{x})= B^{00}\phi_h(\boldsymbol{\theta}^{00}, \mathbf{x}) + B^{01}\phi_h(\boldsymbol{\theta}^{01}, \mathbf{x}) + B^{10}\phi_h(\boldsymbol{\theta}^{10}, \mathbf{x}) + B^{11}\phi_h(\boldsymbol{\theta}^{11}, \mathbf{x}) \in E^{\boldsymbol{\theta}}_h
+    \end{align*} 
+    such that 
+    \begin{align*}
+        \begin{bmatrix}
+        B^{00}\\
+        B^{01}\\
+        B^{10}\\
+        B^{11}
+    \end{bmatrix} = \widehat{S}_h\left(\boldsymbol{\theta}\right)^{\nu_2}\widehat{K}^H_h\left(\boldsymbol{\theta}\right)\widehat{S}_h\left(\boldsymbol{\theta}\right)^{\nu_1}\begin{bmatrix}
+        A^{00}\\
+        A^{01}\\
+        A^{10}\\
+        A^{11}
+    \end{bmatrix}
+    \end{align*}
+    where $\widehat{K}^H_h\left(\boldsymbol{\theta}\right) = \left(I_4 - \widehat{I}^h_{2h}\left(\boldsymbol{\theta}\right)\left(\widehat{L}_{2h}\left(\boldsymbol{\theta}\right)\right)^{-1}\widehat{I}^{2h}_h\left(\boldsymbol{\theta}\right)\widehat{L}_h\left(\boldsymbol{\theta}\right)\right)$
+\end{corollary}
+
+\begin{proof}
+    This is follows directly from \Cref{th:lfatwogrid}.
+\end{proof}
+% $E^{\boldsymbol{\theta}}_h$ is invariant under the $K^H_h$ operator, which means that if $\psi \in E^{\boldsymbol{\theta}}_h$, then $\psi(\mathbf{x})= A^{00}\phi_h(\boldsymbol{\theta}^{00}, \mathbf{x}) + A^{01}\phi_h(\boldsymbol{\theta}^{01}, \mathbf{x}) + A^{10}\phi_h(\boldsymbol{\theta}^{10}, \mathbf{x}) + A^{11}\phi_h(\boldsymbol{\theta}^{11}, \mathbf{x})$ and $K^H_h\psi \in E^{\boldsymbol{\theta}}_h$.
+
+
+
+
+
+
+
+
+
+
+\section{Computational Work}
+
+Let $h$ be the finest grid size on which the solution function $u$ must be resolved on. 
+
+\section{Multigrid Algorithms} \label{sec:multigrid}
+
+\sahana{put the pseudocode for 2-grid, V-cycle, and W-cycle}
+
+
+
+\end{document}

@@ -1,0 +1,154 @@
+\documentclass[12pt]{article}
+\usepackage[english]{babel}
+\usepackage[utf8x]{inputenc}
+\usepackage[T1]{fontenc}
+% \usepackage{litreview}
+
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage[a4paper, total={6.5in, 9in}]{geometry}
+
+\usepackage{cleveref}
+\usepackage{graphicx,subfigure}
+\usepackage[caption = false]{subfig}
+\usepackage{subcaption}
+\usepackage{float}
+
+% \DeclareNameAlias{sortname}{family-given}
+
+% \defbibenvironment{bibliography}
+%   {\begin{enumerate}}
+%   {\end{enumerate}}
+%   {\item}
+
+\definecolor{michiganblue}{RGB}{0,39,76}
+\definecolor{darkgreen}{RGB}{0,100,0}
+\definecolor{orange}{RGB}{254, 141, 1}
+\definecolor{lightblue}{RGB}{35, 159, 251}
+\definecolor{lightorange}{RGB}{255,182,104}
+\definecolor{lightgreen}{RGB}{144,238,145}
+\definecolor{lightred}{RGB}{255,127,127}
+\definecolor{purple}{RGB}{114,0,144}
+
+% \addbibresource{mybib.bib}
+
+
+
+% \Author{Sahana Rayan, Ambuj Tewari}
+% % \Lecturer{Snigdha Panigrahi}
+% \Date{\today}
+% \Title{Rebuttals for ICML 2025}
+
+% \lstset{style=mystyle}
+
+\begin{document}
+\title{Thoughts}
+\author{Sahana Rayan}
+\date{March 9, 2026}
+\maketitle
+\section{Summary of the problem}
+
+While our approximate greedy router had strong empirical performance and was able to recover the true greedy strategy, some reviewers noted that the convergence trajectories indicated a nearly uniform routing strategy across samples. This raises a natural question: can solver routing benefit from an \textit{instance-dependent} strategy. 
+
+During the review period, we confirmed that the routing strategy was effectively the same across samples. Specifically, the router always picked the neural operator in the first iteration and relied on the classical solver for the rest of the iterations. See \Cref{fig:fixedgrf}
+
+This result is not very surprising as the upstream neural operator is not trained to perform residual correction. The foundation of HINTS relies on the fact that any neural operator can approximate the solution operator and therefore should be able to predict errors using residuals. This reasoning implicitly assumes that the residuals encountered during an iterative solve follow the same distribution as training data used for the neural operator. 
+
+Recall that in our experiments we generate training data by sampling forcing functions $f$ from a zero-mean Gaussian random field on a periodic domain with covariance operator
+\[
+\alpha(-\Delta + \beta I)^{-\gamma},
+\]
+with parameters $\alpha = 1$, $\beta = 9$, and $\gamma = 2$. For each sampled forcing function, the corresponding ground-truth solution $u$ is computed using a least-squares solver applied to the discretized PDE
+\[
+\mathcal{L}_x^a(u) = f, \quad x \in D.
+\]
+
+The neural operator is trained on such $(f, u)$ pairs
+
+During iterative solving, however, the neural operator is applied to residuals of the form
+\[
+r_t = f - A_h \widehat{u}_t,
+\]
+where $\widehat{u}_t$ is the current iterate. Unlike $f$, these residuals depend on both the current solver state $u_t$ and the solvers used previously. For example, classical iterative methods such as Jacobi rapidly dampen high-frequency error components, and, as a result, the residuals encountered after even a few solver iterations exhibit a different spectral composition from the original forcing functions used during training.
+
+Consequently, the neural operator is applied to inputs that lie outside the distribution on which it was trained. This distribution mismatch limits its effectiveness as a residual corrector beyond the first iteration, where the residual still closely resembles the original forcing. This explains why the learned routing strategy consistently selects the neural operator only in the first step and subsequently relies on the classical solver.
+
+
+\begin{figure}
+    \centering
+    \subfigure[Error Difference]{\includegraphics[width=0.4\textwidth]{images/error_diff_distribution.png}}
+    \subfigure[Error]{\includegraphics[width=0.4\textwidth]{images/proof_of_distribution_shift.png}}
+    \caption{Distribution of error differences (left) and errors (right) across 100 iterations for four sampled PDE instances. The difference between ML solver errors and jacobi errors is almost always positive which indicates that Jacobi achieves smaller errors than the neural solver with limited overlap between the distributions. This difference in performance explains why the router tends to favor the Jacobi solver. }
+    \label{fig:fixedgrf}
+\end{figure}
+
+\section{Proposed Solutions}
+
+\subsection{Widening the Distribution of Forcing Functions}
+
+The analysis above suggests that the primary issue arises from a distribution mismatch between the training data used for the neural operator and the residuals encountered during iterative solving. In particular, the forcing functions used during training are sampled from a single Gaussian random field with fixed spectral parameters. As a result, the neural operator learns to map inputs drawn from a relatively narrow distribution to their corresponding solutions. However, the residuals generated during an iterative solve are not drawn from this distribution. 
+
+To mitigate this mismatch, we propose to train the neural operator using a wider distribution of forcing functions. We do this by sampling the parameters of the Gaussian random fields from various distributions to construct a Hierarchical Gaussian Random Field. Specifically, we sample
+\begin{align*}
+    \alpha &\sim \text{LogUniform}\left(0.09, 9\right) \\
+    \beta &\sim \text{LogUniform}\left(9, 50\right) \\
+    \gamma &\sim \text{Uniform}\left(\{1.5, 2.5, 3.5\}\right)
+\end{align*}
+
+and then sample forcing functions from a zero-mean Gaussian random field on a periodic domain with covariance operator $\alpha(-\Delta + \beta I)^{-\gamma}$. The differences between this hierarchical grf and grf can be seen in \Cref{fig:hierarchical_grfvsgrf}.  Training the neural operator on this broader family of forcing functions increases the diversity of inputs it encounters during training and we hypothesize that this distribution better approximates the range of residuals observed during iterative solving. 
+
+However, as shown in \Cref{fig:hierarchicalgrf}, this proposed distribution shows minimal changes to the distribution of errors observed using the neural operator. 
+
+\begin{figure}
+    \centering
+    \subfigure[Fixed GRF]{\includegraphics[width=0.4\textwidth]{images/grf_visualization.png}}
+    \subfigure[Hierarchical GRF]{\includegraphics[width=0.4\textwidth]{images/hierarchical_grf_visualization.png}}
+    \caption{Samples from Fixed and Hierarchical GRFs}
+    \label{fig:hierarchical_grfvsgrf}
+\end{figure}
+
+% \begin{figure}
+%     \centering
+%     \includegraphics[width=0.5\linewidth]{images/error_diff_distribution_hierarchical.png}
+%     \caption{Enter Caption}
+%     \label{fig:placeholder}
+% \end{figure}
+
+% \begin{figure}
+%     \centering
+%     \includegraphics[width=0.5\linewidth]{images/proof_of_distribution_shift_hierarchical.png}
+%     \caption{Enter Caption}
+%     \label{fig:placeholder}
+% \end{figure}
+
+\begin{figure}
+    \centering
+    \subfigure[Error Difference]{\includegraphics[width=0.4\textwidth]{images/error_diff_distribution_hierarchical.png}}
+    \subfigure[Error]{\includegraphics[width=0.4\textwidth]{images/proof_of_distribution_shift_hierarchical.png}}
+    \caption{Distribution of error differences (left) and errors (right) across 100 iterations for four sampled PDE instances. The difference between ML solver errors and jacobi errors is almost always positive but the distribution seems to be more shifted to the left in comparison to 
+    which indicates that Jacobi achieves smaller errors than the neural solver with limited overlap between the distributions. This difference in performance explains why the router tends to favor the Jacobi solver. }
+    \label{fig:hierarchicalgrf}
+\end{figure}
+
+% . Specifically, rather than fixing the covariance operator of the Gaussian random field, we sample forcing functions from a family of Gaussian random fields with varying spectral parameters. Concretely, we sample
+% \[
+% f \sim \text{GRF}\left(\alpha(-\Delta + \beta I)^{-\gamma}\right),
+% \]
+% where the parameters $\alpha$, $\beta$, and $\gamma$ are drawn from predefined ranges. This hierarchical sampling procedure generates forcing functions with a wider range of spectral properties, including both smooth and oscillatory components.
+
+% Training the neural operator on this broader family of forcing functions increases the diversity of inputs it encounters during training and better approximates the range of residuals observed during iterative solving. The goal is to encourage the neural operator to learn a more robust mapping that remains effective even when applied to solver states encountered later in the iteration process.
+
+
+\subsection{Train the neural operator as a residual corrector for Jacobi}
+\subsection{Train the Neural operator to be an iterative solver}
+
+The formulation presented in Section 3 of the original write-up uses the neural operator like a stationary preconditioner. And so, it might be better 
+
+\subsection{Neural Preconditioning functions}
+
+
+
+
+\end{document}

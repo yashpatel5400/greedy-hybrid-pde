@@ -1,0 +1,79 @@
+\newcommand{\wcmaintable}{
+\begin{tabular}{llcccc}
+\toprule
+Equation & $N$ & Solver only & HINTS ($\tau{=}25$) & Learned router (ours) & \textit{Cost-aware oracle} \\ \midrule
+Poisson & $31\times31$ & 11.5\,ms (1.0$\times$) & 982\,$\mu$s (11.6$\times$) & 1.1\,ms (10.1$\times$) & 874\,$\mu$s (13.1$\times$) \\
+Poisson & $63\times63$ & 90.0\,ms (1.0$\times$) & 7.2\,ms (12.4$\times$) & 8.5\,ms (10.5$\times$) & 6.7\,ms (13.4$\times$) \\
+Poisson & $127\times127$ & 1.03\,s (1.0$\times$) & 822.0\,ms (1.2$\times$) & 374.9\,ms (2.8$\times$) & 231.5\,ms (4.4$\times$) \\
+\midrule
+ConvDiff & $31\times31$ & 13.8\,ms (1.0$\times$) & 1.2\,ms (11.7$\times$) & 1.4\,ms (9.7$\times$) & 1.1\,ms (12.2$\times$) \\
+ConvDiff & $63\times63$ & 111.9\,ms (1.0$\times$) & 8.1\,ms (14.0$\times$) & 9.2\,ms (12.0$\times$) & 8.0\,ms (13.7$\times$) \\
+ConvDiff & $127\times127$ & 1.39\,s (1.0$\times$) & 759.1\,ms (1.8$\times$) & 471.3\,ms (3.0$\times$) & 230.1\,ms (5.8$\times$) \\
+\bottomrule
+\end{tabular}}
+\newcommand{\wctoltablepoisson}{
+\begin{tabular}{llccccc}
+\toprule
+$N$ & Method & $\varepsilon{=}10^{-3}$ & $\varepsilon{=}h^2$ & $\varepsilon{=}10^{-5}$ & $\varepsilon{=}10^{-6}$ & $\varepsilon{=}10^{-8}$ \\ \midrule
+$31^2$ & Solver only & 11.5\,ms (1.0$\times$) & 11.5\,ms (1.0$\times$) & 19.3\,ms (1.0$\times$) & 23.3\,ms (1.0$\times$) & 31.3\,ms (1.0$\times$) \\
+ & HINTS ($\tau{=}25$) & 982\,$\mu$s (11.7$\times$) & 982\,$\mu$s (11.6$\times$) & 11.5\,ms (1.7$\times$) & 20.3\,ms (1.1$\times$) & 37.9\,ms (0.9$\times$) \\
+ & Learned router (ours) & 1.1\,ms (10.0$\times$) & 1.1\,ms (10.1$\times$) & 15.5\,ms (1.2$\times$) & 25.9\,ms (0.9$\times$) & 46.7\,ms (0.7$\times$) \\
+ & \textit{Cost-aware oracle} & 886\,$\mu$s (12.9$\times$) & 874\,$\mu$s (13.1$\times$) & 12.4\,ms (1.5$\times$) & 20.7\,ms (1.1$\times$) & 37.1\,ms (0.9$\times$) \\
+\midrule
+$63^2$ & Solver only & 74.8\,ms (1.0$\times$) & 90.0\,ms (1.0$\times$) & 125.6\,ms (1.0$\times$) & 151.1\,ms (1.0$\times$) & 202.9\,ms (1.0$\times$) \\
+ & HINTS ($\tau{=}25$) & 4.8\,ms (15.7$\times$) & 7.2\,ms (12.4$\times$) & 74.3\,ms (1.7$\times$) & 131.8\,ms (1.1$\times$) & 249.7\,ms (0.8$\times$) \\
+ & Learned router (ours) & 5.8\,ms (12.9$\times$) & 8.5\,ms (10.5$\times$) & 54.1\,ms (2.3$\times$) & 107.1\,ms (1.4$\times$) & 230.2\,ms (0.9$\times$) \\
+ & \textit{Cost-aware oracle} & 4.8\,ms (15.8$\times$) & 6.7\,ms (13.4$\times$) & 40.7\,ms (3.1$\times$) & 89.4\,ms (1.7$\times$) & 191.7\,ms (1.0$\times$) \\
+\midrule
+$127^2$ & Solver only & 729.1\,ms (1.0$\times$) & 1.03\,s (1.0$\times$) & 1.22\,s (1.0$\times$) & 1.48\,s (1.0$\times$) & 1.99\,s (1.0$\times$) \\
+ & HINTS ($\tau{=}25$) & 82.9\,ms (8.6$\times$) & 822.0\,ms (1.2$\times$) & 1.54\,s (0.8$\times$) & 2.59\,s (0.6$\times$) & 4.57\,s (0.4$\times$) \\
+ & Learned router (ours) & 68.7\,ms (11.1$\times$) & 374.9\,ms (2.8$\times$) & 630.5\,ms (1.9$\times$) & 946.9\,ms (1.6$\times$) & 1.95\,s (1.0$\times$) \\
+ & \textit{Cost-aware oracle} & 71.9\,ms (10.1$\times$) & 231.5\,ms (4.4$\times$) & 494.2\,ms (2.6$\times$) & 852.4\,ms (1.7$\times$) & 2.02\,s (1.0$\times$) \\
+\bottomrule
+\end{tabular}}
+\newcommand{\wctoltableconv}{
+\begin{tabular}{llccccc}
+\toprule
+$N$ & Method & $\varepsilon{=}10^{-3}$ & $\varepsilon{=}h^2$ & $\varepsilon{=}10^{-5}$ & $\varepsilon{=}10^{-6}$ & $\varepsilon{=}10^{-8}$ \\ \midrule
+$31^2$ & Solver only & 13.9\,ms (1.0$\times$) & 13.8\,ms (1.0$\times$) & 23.8\,ms (1.0$\times$) & 29.1\,ms (1.0$\times$) & 39.4\,ms (1.0$\times$) \\
+ & HINTS ($\tau{=}25$) & 1.2\,ms (11.8$\times$) & 1.2\,ms (11.7$\times$) & 16.2\,ms (1.5$\times$) & 27.7\,ms (1.0$\times$) & 50.9\,ms (0.9$\times$) \\
+ & Learned router (ours) & 1.4\,ms (9.7$\times$) & 1.4\,ms (9.7$\times$) & 21.4\,ms (1.1$\times$) & 34.1\,ms (0.8$\times$) & 60.6\,ms (0.7$\times$) \\
+ & \textit{Cost-aware oracle} & 1.1\,ms (12.2$\times$) & 1.1\,ms (12.2$\times$) & 16.9\,ms (1.4$\times$) & 27.0\,ms (1.1$\times$) & 47.5\,ms (0.9$\times$) \\
+\midrule
+$63^2$ & Solver only & 91.9\,ms (1.0$\times$) & 111.9\,ms (1.0$\times$) & 158.0\,ms (1.0$\times$) & 191.5\,ms (1.0$\times$) & 258.6\,ms (1.0$\times$) \\
+ & HINTS ($\tau{=}25$) & 5.8\,ms (15.7$\times$) & 8.1\,ms (14.0$\times$) & 74.3\,ms (2.1$\times$) & 148.4\,ms (1.3$\times$) & 292.8\,ms (0.9$\times$) \\
+ & Learned router (ours) & 6.8\,ms (13.4$\times$) & 9.2\,ms (12.0$\times$) & 70.4\,ms (2.2$\times$) & 145.2\,ms (1.3$\times$) & 297.4\,ms (0.9$\times$) \\
+ & \textit{Cost-aware oracle} & 6.0\,ms (15.1$\times$) & 8.0\,ms (13.7$\times$) & 59.5\,ms (2.6$\times$) & 126.1\,ms (1.5$\times$) & 259.6\,ms (1.0$\times$) \\
+\midrule
+$127^2$ & Solver only & 975.5\,ms (1.0$\times$) & 1.39\,s (1.0$\times$) & 1.66\,s (1.0$\times$) & 2.01\,s (1.0$\times$) & 2.73\,s (1.0$\times$) \\
+ & HINTS ($\tau{=}25$) & 83.5\,ms (11.1$\times$) & 759.1\,ms (1.8$\times$) & 1.46\,s (1.1$\times$) & 2.41\,s (0.8$\times$) & 4.32\,s (0.6$\times$) \\
+ & Learned router (ours) & 87.4\,ms (10.4$\times$) & 471.3\,ms (3.0$\times$) & 785.5\,ms (2.2$\times$) & 1.21\,s (1.7$\times$) & 2.55\,s (1.0$\times$) \\
+ & \textit{Cost-aware oracle} & 89.0\,ms (10.7$\times$) & 230.1\,ms (5.8$\times$) & 580.4\,ms (2.8$\times$) & 1.19\,s (1.7$\times$) & 2.88\,s (0.9$\times$) \\
+\bottomrule
+\end{tabular}}
+\newcommand{\wcsolvertable}{
+\begin{tabular}{llcccc}
+\toprule
+Setting & Solver & Solver only & HINTS ($\tau{=}25$) & Learned router (ours) & \textit{Cost-aware oracle} \\ \midrule
+Poisson $63^2$ & Jacobi & 90.0\,ms (1.0$\times$) & 7.2\,ms (12.4$\times$) & 8.5\,ms (10.5$\times$) & 6.7\,ms (13.4$\times$) \\
+Poisson $63^2$ & Jacobi (0.67) & 134.7\,ms (1.0$\times$) & 10.1\,ms (13.3$\times$) & 11.6\,ms (11.6$\times$) & 10.0\,ms (13.5$\times$) \\
+Poisson $63^2$ & GS & 104.4\,ms (1.0$\times$) & 7.5\,ms (14.0$\times$) & 8.4\,ms (12.5$\times$) & 7.9\,ms (13.3$\times$) \\
+Poisson $63^2$ & SOR (1.5) & 36.9\,ms (1.0$\times$) & 3.6\,ms (10.2$\times$) & 3.9\,ms (9.5$\times$) & 3.6\,ms (10.3$\times$) \\
+ConvDiff $63^2$ & Jacobi & 111.9\,ms (1.0$\times$) & 8.1\,ms (14.0$\times$) & 9.2\,ms (12.0$\times$) & 8.0\,ms (13.7$\times$) \\
+ConvDiff $63^2$ & SOR (1.5) & 11.6\,ms (1.0$\times$) & 3.6\,ms (3.2$\times$) & 1.9\,ms (6.0$\times$) & 1.7\,ms (6.7$\times$) \\
+Poisson $127^2$ & Jacobi & 1.03\,s (1.0$\times$) & 822.0\,ms (1.2$\times$) & 374.9\,ms (2.8$\times$) & 231.5\,ms (4.4$\times$) \\
+Poisson $127^2$ & SOR (1.5) & 533.2\,ms (1.0$\times$) & 50.1\,ms (10.7$\times$) & 52.4\,ms (10.2$\times$) & 50.3\,ms (10.6$\times$) \\
+\bottomrule
+\end{tabular}}
+\newcommand{\wchintstable}{
+\begin{tabular}{lccccc}
+\toprule
+Method & $\varepsilon{=}10^{-3}$ & $\varepsilon{=}h^2$ & $\varepsilon{=}10^{-5}$ & $\varepsilon{=}10^{-6}$ & $\varepsilon{=}10^{-8}$ \\ \midrule
+HINTS ($\tau{=}5$) & 8.9\,ms (8.3$\times$) & 53.4\,ms (1.7$\times$) & 219.5\,ms (0.6$\times$) & 346.6\,ms (0.4$\times$) & 607.0\,ms (0.3$\times$) \\
+HINTS ($\tau{=}10$) & 5.8\,ms (13.0$\times$) & 14.3\,ms (6.3$\times$) & 109.9\,ms (1.1$\times$) & 178.9\,ms (0.8$\times$) & 319.8\,ms (0.6$\times$) \\
+HINTS ($\tau{=}25$) & 4.8\,ms (15.7$\times$) & 7.2\,ms (12.4$\times$) & 74.3\,ms (1.7$\times$) & 131.8\,ms (1.1$\times$) & 249.7\,ms (0.8$\times$) \\
+HINTS ($\tau{=}50$) & 4.6\,ms (16.2$\times$) & 6.4\,ms (14.2$\times$) & 58.4\,ms (2.2$\times$) & 112.7\,ms (1.3$\times$) & 222.1\,ms (0.9$\times$) \\
+HINTS ($\tau{=}100$) & 5.7\,ms (13.1$\times$) & 7.9\,ms (11.3$\times$) & 49.6\,ms (2.6$\times$) & 102.3\,ms (1.5$\times$) & 207.5\,ms (1.0$\times$) \\
+Learned router (ours) & 5.8\,ms (12.9$\times$) & 8.5\,ms (10.5$\times$) & 54.1\,ms (2.3$\times$) & 107.1\,ms (1.4$\times$) & 230.2\,ms (0.9$\times$) \\
+\bottomrule
+\end{tabular}}

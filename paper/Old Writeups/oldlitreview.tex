@@ -1,0 +1,104 @@
+\documentclass[12pt]{article}
+\usepackage[english]{babel}
+\usepackage[utf8x]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{mystyle}
+\usepackage{csquotes}
+\usepackage{listings}
+\usepackage{hyperref}
+
+% \DeclareNameAlias{sortname}{family-given}
+
+% \defbibenvironment{bibliography}
+%   {\begin{enumerate}}
+%   {\end{enumerate}}
+%   {\item}
+
+\addbibresource{mybib.bib}
+
+
+
+\Author{Sahana Rayan}
+\Date{\today}
+\Title{Literature Review: Neural Operators}
+
+\lstset{style=mystyle}
+
+\begin{document}
+	\MakeScribeTop
+
+\section{Background} \label{sec:background}
+
+\subsection{Power Series} \label{sec:power}
+
+Reference: \texttt{https://web.math.ucsb.edu/~moore/pde.pdf}.
+
+Infinite Series of the following types is called a power series:
+\begin{align*}
+    e^x &= \sum_{n = 0}^{\infty} \frac{1}{n!}x^n \\
+    \cos x &= \sum_{k = 0}^{\infty} (-1)^k \frac{1}{(2k)!}x^{2k} \\
+    \sin x &= \sum_{k = 0}^{\infty} (-1)^k \frac{1}{(2k + 1)!}x^{2k + 1}
+\end{align*}
+ 
+Power series, more generally, is of the following form
+\begin{align*}
+    \sum_{n = 0}^{\infty} a_n(x - x_0)^{n}
+\end{align*}
+and they are best used for approximations.
+
+For any power series, there exists $R$, which is a nonnegative real number or $\infty$, such that
+\begin{enumerate}
+    \item the power series converges when $|x - x_0| < R$
+    \item and the power series diverges when $|x - x_0| > R$
+\end{enumerate}
+$R$ is called radius of convergence.
+
+For example, $s_N = \sum_{n = 0}^{N} x^n = \frac{1 - x^N}{1 - x}$. $\lim_{N \to \infty} s_N = \frac{1}{1 - x}$ if $|x| < 1$ otherwise it diverges. Here, $R = 1$. More generally, $\sum_{n = 0}^{N} \left(\frac{x}{b}\right)^n$ has a radius of convergence of $R = b$
+
+\textbf{Ratio test}:
+The radius of convergence is given by:
+\begin{align*}
+    R = \lim_{n \to \infty} \frac{|a_n|}{|a_{n + 1}|}
+\end{align*}
+as long as the limit exists. 
+
+So, for $\sum_{n = 0}^{N} \left(\frac{x}{b}\right)^n$, $a_n = \frac{1}{b^n}$, so $\frac{|a_n|}{|a_{n + 1}|} = b$ and so $R = b$.
+
+For the power series of $e^x$, $a_n = \frac{1}{n!}$ and so, $\lim_{n \to \infty} \frac{|a_n|}{|a_{n + 1}|} = \lim_{n \to \infty}  \frac{(n + 1)!}{n!} = \lim_{n \to \infty}  n + 1 = \infty$. This means that the power series converges for all $x$. On the other hand, $\sum_{n = 0}^{\infty} n!x^n$, the ratio is $\frac{1}{n + 1}$ and that limit is $0$. Which means the power series doesn't converge for any non-zero $x$.
+
+\textbf{Comparison Test:} Suppose that there are two power series:
+\begin{align*}
+    \sum_{n = 0}^{\infty} a_n(x - x_0)^{n} \\
+    \sum_{n = 0}^{\infty} b_n(x - x_0)^{n}
+\end{align*}
+They have radii of convergence $R_1, R_2$ respectively. If $|a_n| \leq |b_n|$ for all $n$, then $R_1 \geq R_2$. If $|a_n| \geq |b_n|$ for all $n$, then $R_1 \leq R_2$. In other words, power series with smaller coefficients will result in larger radius of convergence.
+
+For example, with the power series of $\cos x$, $|a_n| \geq \frac{1}{n!}$. We also know that $a_n = \frac{1}{n!}$ for the power series of $e^x$ whose radius of convergence is $\infty$. Therefore, $\cos x$ must have a radius of convergence at least as large as that of $e^x$. Therefore, it also converges for all values of $x$.
+
+A function $f(x)$ is said to be \textbf{real analytic} at $x_0$ if there is a power series $\sum_{n = 0}^{\infty} a_n(x - x_0)^{n}$ about $x_0$ with positive radius of convergence $R$ such that
+$f(x) = \sum_{n = 0}^{\infty} a_n(x - x_0)^{n}$, for $|x - x_0| < R$
+
+
+For example, $e^x$ is real analytic at any $x_0$, $e^x = e^{x_0}e^{x - x_0} =e^{x_0} \sum_{n = 0}^{\infty} \frac{1}{n!}(x - x_0)^n = \sum_{n = 0}^{\infty} a_n(x - x_0)^{n}$ where $a_n = \frac{e^{x_0}}{n!}$. Similarly $f(x) = x^n$ is real analytic at $x_0$ because $x^n = (x - x_0 + x_0)^n = \sum_{i = 0}^n \frac{n!}{i!(n - i)!}x_0^{n - i}(x - x_0)^i$ in which $a_i = \frac{n!}{i!(n - i)!}x_0^{n - i}$ for $i \leq n$ and $a_i = 0$ for $i > n$. 
+
+The sum and product of real analytic functions is real analytic. Any polynomial is analytic at any $x_0$. THe quotient of two polynomial with no common factors is analytic at $x_0$ if and only if $x_0$ is not a zero of the denominator polynomial. 
+
+\subsection{Solving differential equations with power series}
+
+The equation of simple harmonic motion is as follows:
+\begin{align*}
+    \frac{d^2 y}{d x^2} + y = 0
+\end{align*}
+we could assume that $y$ is a power series of some sorts or $y = \sum_{n= 0}^{\infty} a_n x^n$. if that is the case, 
+$$\frac{dy}{dx} = \sum_{n = 1}^{\infty} na_nx^{n - 1}$$
+and differentiating again yields
+$$\frac{d^2 y}{d x^2} = \sum_{n = 2}^{\infty} n(n - 1)a_nx^{n - 2}$$
+if $n = m + 2$ then
+$$\frac{d^2 y}{d x^2} = \sum_{m = 0}^{\infty} (m + 2)(m + 1)a_{m + 2}x^{m}$$
+$m$ is just a dummy variable so you can swap it out for $n$
+$$\frac{d^2 y}{d x^2} = \sum_{n = 0}^{\infty} (n + 2)(n + 1)a_{n + 2}x^{n}$$
+
+
+
+
+\end{document}

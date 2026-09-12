@@ -1,0 +1,18 @@
+\newcommand{\wchintsallsolvers}{
+\begin{tabular}{llcccc}
+\toprule
+& & \multicolumn{2}{c}{Oracle greedy vs HINTS} & \multicolumn{2}{c}{Learned router vs HINTS} \\
+Equation & Solver & $\varepsilon{=}h^2$ & $\varepsilon{=}h^2/10$ & $\varepsilon{=}h^2$ & $\varepsilon{=}h^2/10$ \\ \midrule
+Poisson & Jacobi & \textbf{4.05$\times$} & \textbf{3.50$\times$} & \textbf{3.83$\times$} & \textbf{3.23$\times$} \\
+Poisson & Jacobi (0.67) & \textbf{1.23$\times$} & \textbf{1.25$\times$} & \textbf{1.18$\times$} & \textbf{1.19$\times$} \\
+Poisson & GS & 1.02$\times$ & 1.02$\times$ & 1.01$\times$ & 1.01$\times$ \\
+Poisson & SymGS & 1.00$\times$ & 1.01$\times$ & 0.99$\times$ & 0.99$\times$ \\
+Poisson & SOR (1.5) & 1.00$\times$ & 1.00$\times$ & 0.97$\times$ & 0.98$\times$ \\
+\midrule
+ConvDiff & Jacobi & \textbf{4.20$\times$} & \textbf{3.11$\times$} & \textbf{2.22$\times$} & \textbf{2.31$\times$} \\
+ConvDiff & Jacobi (0.67) & 1.03$\times$ & 1.03$\times$ & 0.99$\times$ & 0.99$\times$ \\
+ConvDiff & GS & 1.00$\times$ & 1.01$\times$ & 0.99$\times$ & 0.99$\times$ \\
+ConvDiff & SymGS & 1.03$\times$ & 1.05$\times$ & 1.02$\times$ & 1.02$\times$ \\
+ConvDiff & SOR (1.5) & 0.98$\times$ & 0.98$\times$ & 0.97$\times$ & 0.97$\times$ \\
+\bottomrule
+\end{tabular}}

@@ -1,0 +1,176 @@
+\documentclass[12pt]{article}
+\usepackage[english]{babel}
+\usepackage[utf8x]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{myst}
+\usepackage{csquotes}
+\usepackage{listings}
+\usepackage{hyperref}
+\usepackage{cleveref}
+\usepackage{soul}
+\usepackage{bbm}
+
+% \DeclareNameAlias{sortname}{family-given}
+
+% \defbibenvironment{bibliography}
+%   {\begin{enumerate}}
+%   {\end{enumerate}}
+%   {\item}
+
+\addbibresource{mybib.bib}
+
+
+
+\Author{}
+\Date{\today}
+\Title{Yash Notes}
+
+\lstset{style=mystyle}
+
+\begin{document}
+	\MakeScribeTop
+
+\section{Introduction} \label{sec:intro}
+Let us consider the problem of learning to defer to numerical solvers for PDEs. In traditional methods of deferral, we are solving the problem
+\begin{align*}
+    \mathcal{L}(\theta) 
+    := \sum_t (1 - r(x_t)) \ell(f(x_t), y_t) + r(x_t) c_t,
+\end{align*}
+The issue with this is that $r : \mathcal{X}\to\{0,1\}$ is non-differentiable if naively attempted to use. For this reason, we often introduce convex surrogates to this that allow for the end-to-end optimization of such a rejector. Note that, upon rejection, the expert is assumed to always return the correct token. 
+
+A very critical aspect of this token-by-token rejection scheme is that there is this decomposition between the terms of the loss function into a per-token sum. In addition to this decomposition, once a token has been predicted, it is ``done'' and not to be interacted with again, i.e. the prediction for that particular token finalizes it and cements its value. 
+
+Actually, the approach stated above was not quite accurate. The rejector actually learns the map $r : \mathcal{X} \times \mathcal{Y}^{t-1}\to\mathcal{Y}$ for each time step $t$, i.e. this rejector takes on an autoregressive form of whether or not to reject.
+
+We want to find an analogous system for a hybrid solver. Hybrid solvers currently make use of a fixed interleaving strategy, where every $T$ iterations, a hybrid solver is called. There are two senses in which a PDE solver has ``tokens.'' The first is in the spatial (or frequency) domain, where the tokens are for particular regions. The second sense is in steps of a solver. The second one does not as immediately fit into this framework, since there is an indefinite number of steps that the predictor may take prior to be considered ``done.'' The other difference is that, unlike in the token-wise rejector case, where there is a ``correct'' answer at each point, there is no sense in which there is a ``correct'' answer if viewing this as a sequence of decision whether or not to route to the numerical solver. This in turn means there is no signal to train on in the analogous way that there is for a true token-based scenario. While this \textit{can} be viewed as an RL problem with sparse signal given at the end of the prediction pipeline, this is enough of a departure from the token-level deferral framework that we should see how far we can go along the alternate path. 
+
+We, therefore, focus on hybrid solvers and view tokens in this situation as being the modes in the Fourier basis, i.e. that we have a function $\widehat{u} : \mathbb{Z}\to\mathbb{C}$ that we wish to learn. We now wish to put this into the learning to defer framework. The issue compared to the standard deferral setting is that there is no analogous ``solver per token'' option: both the numerical solver and neural operator effectively solve over the whole. Or wait, maybe this is untrue? If we consider the restriction to different grid coarsenesses? Hmm, let's see about that idea.
+
+\newpage
+\section{Method}
+The idea with this work was to extend the work from partial deferrals to the context of infinite-dimensional spectra. In particular, while ultimately we do operate on the finite-dimensional truncation of the data, the infinite-dimensional form lends itself for interesting analysis that is uniquely present in the context of functions. 
+
+Formally, suppose we have some solution operator given in the frequency domain $\mathcal{G} : \ell^2\to\ell^2$. We then suppose there exists an infinite collection of oracle solvers $P_{\Delta}$, where $\Delta$ is the spatial resolution of the numerical solver $P$ that can be specified to arbitrary precision. 
+
+\textbf{Question:} One question to figure out is, given that we have this collection of experts with varying spectral biases, should we be mixing them in some way or be doing something iteratively? In the former case, we have some mixture of expert style algorithm, where the different models are simultaneously combined, i.e. the numerical solvers $P_{\Delta_1}, ..., P_{\Delta_n}$ are combined with weights $w_1, ..., w_n$ to produce the final prediction along with potentially some weight on a neural operator. Interestingly, at this level of abstraction, it is not so clear if there is actually any need to explicitly include details of the neural operator. In other words, we could just treat the neural operator as a particular model with some spectral biases that can be characterized.
+
+Most abstractly, we have some set of models whose errors can be characterized over a subset of the spectral domain. Abstractly, we suppose we have models that make predictions over a sequence of tokens $\mathcal{T}^{N}$, i.e. for an $N$ length sequence over some token alphabet $\mathcal{T}$. In its greatest abstraction, this problem may lose any structure of the neural operator itself that makes it interesting. Instead of this, we may wish to consider something slightly more structured. For instance, in the case of the HINTS solver, we know we are iterating back and forth between a Jacobi solver and this neural operator. 
+
+From the beginning: we assume we have some solvers $P_i$ that map, in the frequency domain, some input to output spectra $\ell^2\to\ell^2$. These $P_i$ may be numerical solvers or may be neural operators. To our deferral method, it is somewhat immaterial. The question of interest is, what is the problem we are ultimately trying to solve here? We are attempting to improve the convergence rates for these relaxation methods. This setting and metric are quite clear: how many iterations does it take to reach some error threshold. 
+
+In an iterative scheme, we have an operator mapping $e\to\Delta$. We have many possible models we can dispatch to that does this mapping, i.e. all the numerical solvers are aimed at making exactly this mapping. In HINTS, the swapping between the neural operator and the classical solver, at a cadence that is arbitrarily chosen. Additionally, the solver is just fixed to be some particular solver, i.e. fixed to be Jacobi or Gauss-Seidel. These are iterative schemes that solve the linear system $Ax = b$. Multi-grid is the same, but there are additional complications for multi-grid around choices of cycle depth and such. In other words, for multi-grid, there are more decisions to be made. In Jacobi, there is only a single ``expert,'' whereas for multi-grid, there are many.
+
+The question, therefore, is what is novel from the learning to defer perspective? Honestly, it seems like it may be similar to the previous works in this regard. The novelty is \textit{not} in the deferral space, but rather in the insight that such work has application to the space of operators being combined with numerical solvers. So, merely providing that insight, both in the simple Jacobi case and the multi-grid case, would be nice. 
+
+As mentioned, we could view the ``sequence'' here as the sequence of predictions (i.e. iterates of the relaxation methods) or over the spectrum. Now, the problem with view the spectrum as the sequence in this context is not particularly meaningful. The problem is, unlike previous cases where we have applied expert deferral, here you cannot simply look at a mode in isolation. This means, at each step, we have to account for \textit{all} the modes, rendering this framework of deferral on a token basis sort of meaningless in this setting.
+
+In other words, the sequence to be considered here is not that of the spectrum but rather, that of iterates. With that established, we now switch from the framework of thinking about how many iterates until reaching a particular error threshold to the ``dual,'' i.e. for a fixed number of iterations, what is the optimal sequence of routing. There is the problem that there is no ``true'' answer (although even that may be incorrect -- there may actually be a correct choice given the sequence length and such).
+
+\newpage
+\section{Formalism}
+We now consider the formal statement of the deferral to numerical solvers framework. We seek the solution of a PDE specified as
+\begin{align*}
+    \mathcal{L} u  &= f \qquad x \in\Omega\\
+    \mathcal{B} u  &= g \qquad x \in\partial\Omega,
+\end{align*}
+where $u,f\in\mathcal{H}^{s}(\Omega)$ are $s$-smooth functions over which differential operators $\mathcal{L}$ and $\mathcal{B}$ are well-defined. We then seek a solution operator $\mathcal{G} : f\to u$. We are interested in the setting where such PDEs were traditionally solved with relaxation methods, such as Jacobi or multigrid iteration. We begin this discussion with Jacobi-neural operator hybrid schemes and subsequently expand this to multi-grid solvers. 
+
+In the classical Jacobi solver, we discretize the grid to some fixed resolution, such that $\vec{u}_{n} := u(n\Delta x)$, where $\vec{u}\in\mathbb{R}^{N}$. For notational simplicity, we simply consider the setting of $\Omega\subset\mathbb{R}$ for this current exposition, but the extension to multidimensional domains follows immediately. 
+
+We, therefore, have a discretized operator $L$ and see to solve the matrix equation $L \vec{u} = \vec{f}$. Traditionally, such equations were solved with iterative methods to exploit the structure of the difference matrix $L$. In general, such iterative schemes begin with some initial guess $\vec{u}^{(0)}$ and refine it. In particular, we wish to update
+\begin{equation}
+    \vec{u}^{(k+1)}\gets\vec{u}^{(k)} + \Delta^{(k)},
+\end{equation}
+such that $\vec{u}^{(k+1)}$ satisfies the desired equation, i.e. $L \vec{u}^{(k+1)} = \vec{f}$. Expanding this, we see
+\begin{align*}
+    L \vec{u}^{(k+1)}
+    &:= L (\vec{u}^{(k)} + \Delta^{(k)})\\
+    &:= L \vec{u}^{(k)} + L \Delta^{(k)}
+    = \vec{f} \\
+    \implies
+    L \Delta^{(k)} &= \vec{f} - L \vec{u}^{(k)} =: r^{(k)}
+\end{align*}
+In other words, we seek to find the $\Delta^{(k)}$ that maps to the residual. Naturally, however, solving this problem is no simpler than solving the original matrix equation. To get around this issue, Jacobi iteration simply involves solving for the \textit{diagonal} part of $L$. That is, we instead solve the system $\mathrm{diag}(L) \Delta^{(k)} = r^{(k)}$. This is not how this Jacobi iteration is typically presented, where it is instead presented with a decomposition of $A = D - L - U$. To see the connection to this form, we simply note that (temporarily denoting $L$ from the differential equation as $A$ to allow for the Jacobi decomposition):
+\begin{align*}
+    A \vec{u}
+    = (D - L - U) \vec{u}
+    = \vec{f}
+\end{align*}
+We now separate and \textit{only} keep the diagonal part to reference the next iterate and make the other two reference the current iterate, namely as:
+\begin{align*}
+    (D - L - U) \vec{u}
+    \to
+    D \vec{u}^{(k+1)} - L \vec{u}^{(k)} - U \vec{u}^{(k)}
+    &= \vec{f}\\
+    \implies 
+    D \vec{u}^{(k+1)}
+    &= \vec{f} + L \vec{u}^{(k)} + U \vec{u}^{(k)} \\
+    \implies 
+    \vec{u}^{(k+1)}
+    &= D^{-1}\vec{f} + D^{-1} (L + U) \vec{u}^{(k)}
+\end{align*}
+With some further manipulation, you can get it to the form described, namely as:
+\begin{align*}
+    \left(D^{-1}\vec{f} + D^{-1} (L + U) \vec{u}^{(k)}\right) + \vec{u}^{(k)} - \vec{u}^{(k)}
+    &= \left(D^{-1}\vec{f} + D^{-1} (L + U) \vec{u}^{(k)}\right) + \vec{u}^{(k)} - D^{-1} D \vec{u}^{(k)} \\
+    &= D^{-1} \left(\vec{f} + (L + U) \vec{u}^{(k)} - D \vec{u}^{(k)} \right) + \vec{u}^{(k)}\\
+    &= D^{-1} \left(\vec{f} - (D - L - U) \vec{u}^{(k)} \right) + \vec{u}^{(k)}\\
+    &= D^{-1} \left(\vec{f} - A \vec{u}^{(k)} \right) + \vec{u}^{(k)}\\
+    &= D^{-1} r^{(k)} + \vec{u}^{(k)},
+\end{align*}
+giving precisely the aforementioned form, i.e. the diagonal approximation to the original matrix equation. 
+
+The question, therefore, is, if we have such iterative refinement scheme in which we solve $L \Delta = r$ over a series of approximations to $L$, could we get a speedup by instead interspersing maps of $\mathcal{G} : r\to\Delta$ followed by some steps of the Jacobi solver and so on? This is precisely the basis of the HINTS approach. 
+
+Note that, if instead of \textit{just} the diagonal you used the lower triangular part of the matrix, i.e. $D - L$, you would recover the Gauss-Seidel method. The successive over-relaxation approach is simply an approximation atop Gauss-Seidel. The question, therefore, does not change with these more advanced methods: can a neural operator used in conjunction improve performance?
+
+Initial works in this vein have empirically established the answer to be a yes. Such approaches, however, are predicated on heuristics of how to balance the cost to running numerical solvers with neural operators largely by user intuition, sacrificing efficiency in the end-to-end use of these hybrid methods.
+
+\subsection{Problem Statement}
+We, therefore, seek to instead learn these with the use of the learning to defer framework posited in past works. To adopt this framework, we suppose we have a fixed iteration budget $T$ of calls we can dispatch and wish to minimize a weighted combination of the computational cost and the error. For this basic version, we suppose the only expert available is the Jacobi solver; we will eventually relax this assumption to allow for the use of alternate solvers. Such solvers map $r^{(k)}\to\Delta^{(k)}$ as discussed, whether that be with the explicit approximation in traditional solvers or with an implicit map via a neural operator. The loss is then 
+
+\newpage
+\section{Optimal Solver Routing}
+\subsection{General Problem Setup}
+We consider the problem of designing an optimal hybrid solver strategy between a numerical solver and neural operator. We begin this discussion with the setting of a single numerical solver being coupled with the neural operators; we later demonstrate such a treatment can then be directly extended to the setting of multiple numerical solvers, such as in the context of multi-grid solvers. We additionally assume an infinite compute budget initially and later integrate this facet. 
+
+Suppose, therefore, that we have a differential equation $\mathcal{D} u = f$ for $u, f\in\mathcal{H}^{s}(\Omega)$ and $\mathcal{D} : \mathcal{H}^{s}(\Omega)\to\mathcal{H}^{s}(\Omega)$.  We assume such a system is to be then solved over a corresponding discretized system $D \vec{u} = \vec{f}$ for some discretization resolution $N$, i.e. $\vec{u},\vec{f}\in\mathbb{R}^{N}$ and $D\in\mathbb{R}^{N\times N}$. To solve this system, we would traditionally proceed in an iterative fashion, beginning with an arbitrarily initialized $\vec{u}^{(0)}$ and then iteratively refining this by measuring the residual $\vec{r}^{(t)} := \vec{f} - D \vec{u}^{(t)}$ and solving some approximation to the residual equation $D \Delta^{(t)} = \vec{r}^{(t)}$. For instance, in the Jacobi iteration, this approximation solution is made by just considering the diagonal of $D$. 
+
+We seek to minimize the final $\mathcal{L}^2$ error, i.e.
+\begin{equation}
+    \ell(u, f) = \int_{\Omega} || u(x) - \mathcal{D}f(x) ||^2\, dx
+\end{equation}
+By Parseval's identity, this can be equivalently represented in the frequency domain by
+\begin{equation}
+    \ell(u, f) = \sum_{k\in\mathbb{Z}^{d}} (\widehat{u}_k - \widehat{\mathcal{D}f}_k)^2
+\end{equation}
+In the discretized representation, this sum is truncated at the Nyquist frequency, i.e. only indexes $k\in\mathbb{Z}^{d} : |k|_{\infty} < N / 2$. For such a truncation, we clearly have that the error is given by the norm $|| \vec{e} ||_2^2$ of the vector with components $\vec{e}_k := \widehat{u}_k - \widehat{\mathcal{D}f}_k$.
+
+\subsection{Frequency Dampening Perspective}
+Abstractly, therefore, we suppose there is an error vector $\vec{e}\in\mathbb{R}^{N}$ and a collection of solvers with complete characterizations of frequency responses $S_1, ..., S_N\in\mathbb{R}^{N\times N}$ where $\vec{e}' := S_1 \vec{e}$ would, for instance, be the corresponding errors across frequencies after applying solver $S_1$. Note that a given solver will often have a frequency band in which they will decrease the error magnitude, i.e. have desirable performance, and others with undesirable error amplification. Given such a collection, the goal is to then determine the optimal sequence $\sigma^* : [T]\to[N]$ of solver invocations satisfying
+\begin{equation}
+    \sigma_* := \argmin_{\sigma} || S_{\sigma(T)}...S_{\sigma(1)} \vec{e} ||^2
+\end{equation}
+We now seek to solve this optimization problem. In practical settings, however, $T$ is often $\approx 10^3$ or $10^4$, meaning the number of possible solver strategies $N^{T}$ is intractably large to search over. We consider a greedy strategy and subsequently characterize its suboptimality. The greedy strategy simply defines $\sigma_{\mathrm{G}}(i) := \argmin_{n} || S_{n} S_{\sigma_{\mathrm{G}}(i-1)}...S_{\sigma_{\mathrm{G}}(1)} \vec{e} ||^2$, i.e. defining the next step to simply be the minimizer under the current mapping. While such a myopic strategy may seemingly suffer poor global performance, we demonstrate this is not the case in particular settings.
+
+In the simplest setting, we have that the solver matrices commute, i.e. $S_m S_n = S_n S_m$ for any $n, m$. In this case, we only need to determine the \textit{allocation} to the different solvers, as the sequence can simply be equivalently expressed as $S := \prod_{i=1}^{N} S_i^{t_i}$, where $\sum_{i=1}^{N} t_i = T$. In other words, in this commuting setting, the optimal routing is given by the following optimization problem:
+\begin{equation}
+\begin{aligned}
+    \min_{t\in\mathbb{N}_{+}^{N}}&\quad \left|\left| \prod_{i=1}^{N} S_i^{t_i} \vec{e} \right|\right|^2 
+    \qquad\mathrm{s.t}\qquad \sum_{i=1}^{N} t_i = T
+\end{aligned}
+\end{equation}
+This problem, as naively posited, again does not lend itself to an efficient solution strategy, as it is formulated over the integers. We, therefore, consider the natural convex relaxation of this problem, where we instead optimize $t\in\mathbb{R}_{+}^{N}$. In other words, we consider the following relaxation:
+\begin{equation}
+\begin{aligned}
+    \min_{t\in\mathbb{R}^{N}}&\quad \left|\left| \prod_{i=1}^{N} S_i^{t_i} \vec{e} \right|\right|^2 
+    \qquad\mathrm{s.t}\qquad \sum_{i=1}^{N} t_i = T, \quad t\succeq 0
+\end{aligned}
+\end{equation}
+Such a problem can be formulated as a geometric program, which can be efficiently solved using classical convex optimization techniques. Doing so, however, requires expressing each solver as a matrix exponential, i.e. that there exists some $L_i$ such that $S_i = e^{L_i}$, which exists if $S_i$ is nonsingular. In practice, a singular solver would imply there is some error vector $\vec{e}\neq 0$ such that $S_i$ perfectly solves the estimation problem on such an instance. Given that no known solution strategies exhibit such behavior, we can assume the aforementioned nonsingularity of the solver matrices. With this rewrite, the formulation as a geometric program follows as
+\begin{align*}
+    \min_{t\in\mathbb{R}^{N}}&\quad \log\left(\left|\left| e^{\sum_i L_i t_i} \vec{e} \right|\right|^2\right)
+    \qquad\mathrm{s.t}\qquad \sum_{i=1}^{N} t_i = T, \quad t\succeq 0
+\end{align*}
+
+\end{document}

@@ -1,0 +1,188 @@
+\documentclass[12pt]{article}
+\usepackage[english]{babel}
+\usepackage[utf8x]{inputenc}
+\usepackage[T1]{fontenc}
+% \usepackage{litreview}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{amsmath}
+% \DeclareNameAlias{sortname}{family-given}
+
+% \defbibenvironment{bibliography}
+%   {\begin{enumerate}}
+%   {\end{enumerate}}
+%   {\item}
+
+\definecolor{michiganblue}{RGB}{0,39,76}
+\definecolor{darkgreen}{RGB}{0,100,0}
+\definecolor{orange}{RGB}{254, 141, 1}
+\definecolor{lightblue}{RGB}{35, 159, 251}
+\definecolor{lightorange}{RGB}{255,182,104}
+\definecolor{lightgreen}{RGB}{144,238,145}
+\definecolor{lightred}{RGB}{255,127,127}
+\definecolor{purple}{RGB}{114,0,144}
+
+% \addbibresource{mybib.bib}
+
+
+
+% \Author{Sahana Rayan, Ambuj Tewari}
+% % \Lecturer{Snigdha Panigrahi}
+% \Date{\today}
+% \Title{Rebuttals for ICML 2025}
+
+% \lstset{style=mystyle}
+
+\begin{document}
+	% \MakeScribeTop
+
+%#############################################################
+%#############################################################
+%#############################################################
+%#############################################################
+
+
+\section*{Color Codes}
+
+\begin{itemize}
+    \item \textcolor{red}{Need more experiments}
+    \item \textcolor{lightred}{Addressed experiment-related comment}
+    \item \textcolor{orange}{Need to make changes to the writeup}
+    \item \textcolor{lightorange}{Addressed writeup change}
+    \item \textcolor{blue}{Need to clarify in rebuttals}
+    \item \textcolor{lightblue}{Made the clarificatiion}
+    \item \textcolor{darkgreen}{Positive reviews}
+    \item \textcolor{lightgreen}{Addressed Positive review}
+    \item \textcolor{purple}{My comments}
+\end{itemize}
+
+
+\section{Official Review of Submission8022 by Reviewer jj9u}
+
+
+
+\subsection*{Strengths}
+
+\begin{enumerate}
+    \item The proposed method provides a theoretical guarantee for approximating the greedy algorithm solution. The proposed surrogate loss is theoretically backed as an upper bound to the original loss.
+    \item The paper shows convincing results over baselines including HINTS and solver only approach. For the solvers, the paper uses different methods including Jacobi, GS and MG.
+    \item The proposed method may be general and could be extended to other control problems or optimization problems beyond PDEs, which shows a broader impact.
+\end{enumerate}
+
+
+\subsection*{Weaknesses}
+
+\begin{enumerate}
+    \item From Fig. 1, for 2D poisson, the proposed method achieves a lower error after 300 or 100 iterations than the solver only method. At iteration 1, the proposed method starts with a lower error than the solver method (due to that at the first iterations, the error reduction is larger for DeepONet than the classical solver) . But if I look at the iterations after 20 or so, the slope for the two methods are identical. This might suggest that the convergence rate might be governed by the classical solver, rather than being significantly accelerated by the routing method. Based on my observations, is it possible that for the first few iterations, the routing mainly selected the DeepONet, and then for the rest, the router mainly selected the classical solvers indicated by the parallel lines. \textcolor{purple}{Strategy: include a visualization to show how the routing decision is changing between examples}
+    \item From Fig. 1, it looks like the solver only method is not bad. By giving it more iterations, it could reach the same error as the proposed method. Because of this, I can’t see a big advantage of the proposed method over the solver only method, given that the proposed method requires lots of training time for preparing a router model. But obviously, the proposed method fixes the issue of the prior work HINTS — wrong choice hurts the performance. However, it looks like the error jump comes from the DeepONet at each fixed iteration. Does it mean the best option without training a router is to first use HINTS for a few iterations, and then do an early stopping or fully use classical solvers only? \textcolor{purple}{Strategy: include a visualization to show how the routing decision is changing between examples}
+\end{enumerate}
+
+\subsection*{Questions}
+\begin{enumerate}
+    \item Why at the first iteration, HINTS and solver only method don’t have the same starting errors? \textcolor{purple}{Strategy: Fix the plots so that we include initial error}
+    \item Could the authors list the choices by the routers for each step? \textcolor{purple}{Strategy: include a visualization to show how the routing decision is changing between examples}
+    \item For the HINTS and for ther iteration where the error increases, it should be the iteration for the DeepONet, right?
+    \item I would like the authors to answer the weakness 2.
+    \item Have the authors tried to incorporate more neural operators in the router choice list?
+\end{enumerate}
+
+\section{Official Review of Submission8022 by Reviewer LCbD}
+
+\subsection*{Strengths}
+
+The paper articulates a principled view of hybrid PDE solving by casting the choice among classical updates and Neural-Operator updates as a sequential decision problem, and it supports this view with a constant-factor guarantee for greedy selection under natural assumptions. The learning procedure is well aligned with the decision objective: pseudo-labels from greedy rollouts and a cost-sensitive convex surrogate ensure that the trained router optimizes for error reduction rather than a proxy that might diverge from actual risk. The empirical results are persuasive. By skipping Neural-Operator steps when they would be harmful, the router stabilizes convergence and improves not only the final error but also the error AUC, which is operationally meaningful. The framework is readily extensible. Because candidate updates can be swapped or augmented without redesigning the method, the approach is promising as a meta-preconditioner or meta-scheduler for a broader class of PDE solvers.
+
+\subsection*{Weaknesses}
+
+\textcolor{red}{Experiments are restricted to 1D/2D Poisson/Helmholtz with periodic boundary conditions. There is no evaluation under non-periodic boundary conditions (Dirichlet/Neumann/mixed, including Robin). Consequently, behavior near boundaries is unclear, and it is difficult to assess whether the reported advantages in final error and error AUC generalize. Please add results on representative 1D/2D problems with these boundary conditions.}
+\textcolor{purple}{Strategy: include experiments to show robustness to different boundary conditions}
+
+\subsection*{Questions}
+
+\begin{enumerate}
+    \item \textcolor{red}{Beyond periodic domains, do the improvements hold under Dirichlet/Neumann/mixed (Robin) boundary conditions in 1D/2D?}
+    \item \textcolor{red}{On identical hardware and iteration budgets, please provide wall-clock, approx. FLOPs, and peak memory versus baselines.}
+\end{enumerate}
+
+\section{Official Review of Submission8022 by Reviewer rmmL}
+
+\subsection*{Strengths}
+Iterative solution of large sparse linear systems is a mature field in numerical linear algebra with countless applications in scientific computing. Most techniques, especially relaxation techniques, are studied from the standpoint of asymptotic results. In contrast, authors of the present contribution are focused on the performance in the finite horizon, which is both novel and potentially
+
+\subsection*{Weaknesses}
+
+In my view, the results the authors demonstrate are not convincing. Experimental results are especially doubtful. On the theoretical side authors were unable to obtain strong results for transient behaviour.
+
+I will clarify these points in the section below.
+
+\subsection*{Questions}
+
+\textbf{Problem with theoretical results}
+
+Suppose matrix $A$ is symmetric positive definite and we have two relaxation methods with symmetric error propagation matrices that have spectral radii $0 < \rho_1 \ll \rho_1 < 1$. So both methods are convergent and one of them is much better than the other one.
+
+An artificial requirement to have a symmetric matrix is needed to use Proposition 4.2 where the Lipschitz constant of the iterative method is used (not used normally for iterative methods).
+
+Now, the optimal solution is to use the best method all the time, since it is much better than the second one by assumption. Given that, Proposition 4.2 implies $\alpha (O) = \max \left(\frac{1}{T}\frac{4}{1 - \rho_1^2}, 1\right)$. Roughly speaking after $5$ iterations we have $\alpha(O) = 1$ (basically for most situations, not specifically for this one). I will assume that $T \gg 1$ and we can safely say take $\alpha(O) = 1$. 
+
+Applying this to Theorem 4.1 we obtain that error (5) for greedy strategy is bounded from above
+
+\begin{equation}
+    \text{error}_{\text{greedy}} \leq (1 - e^{-1})\text{error}_{\text{optimal}} + e^{-1}\text{error}_{\text{initial}}
+\end{equation}
+\textcolor{purple}{
+{\color{purple}\begin{align*}
+    \text{error}_{\text{greedy}} &\leq (1 - e^{-1})\text{error}_{\text{optimal}} + e^{-1}\text{error}_{\text{initial}} \\
+    \text{error}_{\text{initial}}-\text{error}_{\text{greedy}} &\geq -(1 - e^{-1})\text{error}_{\text{optimal}} + (1-e^{-1})\text{error}_{\text{initial}} \\
+    \frac{\text{error}_{\text{initial}}-\text{error}_{\text{greedy}}}{\text{error}_{\text{initial}}-\text{error}_{\text{optimal}}} &\geq 1 - e^{-1} 
+\end{align*}}
+reinterpret the equation and make changes to the writeup}
+
+Now, the error of optimal selection can be estimated in my case and it is rapidly reaching zero. The second term is still there no matter what.
+
+I have the following questions to the authors:
+
+\textcolor{orange}{
+\begin{enumerate}
+    \item Am I missing something?
+    \item If not, what is the use of such an upper bound?
+\end{enumerate}}
+
+\textbf{Problem with empirical evaluation}
+
+\begin{enumerate}
+    \item \textcolor{blue}{The Poisson equation $- \Delta u(x) = f(x)$ with periodic boundary conditions has no unique solution even if $f(x)$ is orthogonal to the kernel of a discretized matrix. It is a very unusual choice for the benchmark of classical iterative methods and learned router. Probably because of that choice, for tiny linear systems authors use, multigrid requires over $100$ iterations to produce error $10^{-2}$. I expect the geometric multigrid results in relative error $10^{-2}$ in about $2$ or $3$ iterations, certainly not $100$. Can the authors report results for well-posed linear problems?} \textcolor{purple}{defend this choice by saying you 0 - centered the solutions to make them unique. and for all numerical solvers we 0-centered their output before evaluating errors}
+    \item \textcolor{blue}{For the Helmholtz equation how $a(x)$ was generated? What is a typical value of this field? Did the authors try to use some iterative solvers tailored to the Helmholtz equation specifically?} \textcolor{purple}{ a and f are sampled from a GRF }
+    \item \textcolor{orange}{Can the authors share the greedy strategy used to train their router and the strategy that the router learned? One way to do that is to use a colour coding scheme: assign colour to each solver, draw selected policy as a set of coloured squares. It would be interesting to look at those pictures for many instances for each equation. My hypothesis is that the selection of the router is rather mundane with DeepONet selected in the first few iterations and best classical method selected most of the time afterwards.} \textcolor{purple}{Strategy: include a visualization to show how the routing decision is changing between examples}
+\end{enumerate}
+
+
+
+\section{Official Review of Submission8022 by Reviewer i478}
+
+\subsection*{Strengths}
+\begin{enumerate}
+    \item The paper moves beyond fixed-schedule hybrids like HINTS, allowing data-dependent solver selection at each iteration.
+    \item The paper establishes weak sequence supermodularity and provides approximation guarantees for the greedy policy.
+\end{enumerate}
+
+
+\subsection*{Weaknesses}
+
+\begin{enumerate}
+    \item There is limited PDE diversity. Evaluations are confined to linear elliptic PDEs on simple domains; it is unclear how well the method generalizes to nonlinear or time-dependent PDEs.
+    \item The router requires supervised data with reference solutions. This may not be practical for large or real-time systems.
+    \item The paper has limited comparison. It only compared to HINTS and single solvers; other hybrid or learned PDE solvers (e.g., operator learning + multigrid co-training) are missing.
+\end{enumerate}
+
+\subsection*{Questions}
+
+\begin{enumerate}
+    \item How does the greedy router perform on nonlinear or time-dependent PDEs where the operator changes across steps?
+    \item Does the method remain stable when neural operator predictions are inaccurate or out-of-distribution?
+    \item How sensitive is the performance to the quality of training data or the initial solver ensemble?
+    \item Can the authors provide results comparing to more hybrid and neural operators?
+\end{enumerate}
+
+\end{document}

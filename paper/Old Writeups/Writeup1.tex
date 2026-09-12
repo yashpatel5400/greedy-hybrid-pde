@@ -1,0 +1,646 @@
+\documentclass[12pt]{article}
+\usepackage[english]{babel}
+\usepackage[utf8x]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{myst}
+\usepackage{csquotes}
+\usepackage{listings}
+\usepackage{hyperref}
+\usepackage{cleveref}
+\usepackage{soul}
+\usepackage{bbm}
+\usepackage{dsfont}
+
+% \DeclareNameAlias{sortname}{family-given}
+
+% \defbibenvironment{bibliography}
+%   {\begin{enumerate}}
+%   {\end{enumerate}}
+%   {\item}
+
+\addbibresource{mybib.bib}
+
+
+
+\Author{}
+\Date{July 28}
+\Title{Collaborative PDE Solver with Neural Operators and Traditional solvers}
+
+\lstset{style=mystyle}
+
+\begin{document}
+	\MakeScribeTop
+
+\section{Introduction} \label{sec:intro}
+
+Natural phenomena and engineered systems are often governed by ordinary and partial differential equations. Solving these equations enables a variety of tasks - predicting the evolution of the system through simulation (e.x., forecasting weather using Navier Stokes Equation) \autocite{kalnay2003atmospheric,bauer2015quiet,staniforth1991semi}, addressing control and optimization problems (e.x., optimizing heat shield design for spacecrafts using heat transfer equations) \autocite{anderson1989hypersonic,troltzsch2010optimal}, and tackling inverse problems based on external measurements (e.x. reconstructing brain activity from EEG data using electrophysiological models) \autocite{baillet2001electromagnetic,grech2008review}. 
+
+Traditionally, PDEs are solved using finite difference methods \autocite{smith1985numerical,leveque2007finite}, which discretize the spatial and/or temporal domain and approximate the solution by solving a system of equations at the discrete grid points. Similarly, finite element methods \autocite{hughes2003finite,bathe2006finite,brenner2008mathematical} construct a system of equations based on fitted curves for each finite element and then rely on numerical linear algebra techniques--such as the Jacobi and Gauss-Seidel method \autocite{saad2003iterative}--to compute the solution. Such iterative methods, however, suffer from high computational costs, especially when finely resolved grids are required--regardless of the sparsity of the coefficient matrix. Moreover, these solvers lack generalization across different initial conditions, boundary conditions, or forcing functions, as even minor changes to any of these parameters require re-solving the entire system of equations from scratch. 
+
+These challenges have motivated the development of neural operators \autocite{kovachki2023neural} - a class of machine learning models that aim to learn the solution operator directly, enabling fast inference across a range of parameters. Neural operators lift the classical linear layer in neural networks to a linear operator--typically a kernel integral operator--between infinite-dimensional function spaces. While the universal approximation theorem of operators \autocite{chen1995universal} suggests that neural operators can approximate solution operators with high accuracy, they are prone to spectral bias \autocite{liu2021multiscale,liu2024mitigating,you2024mscalefno,khodakarami2025mitigating,xu2025understanding}--similar to traditional neural networks \autocite{rahaman2019spectral,xu2019frequency}--and favor learning the low-frequency components of the solution operator, often struggling to capture high-frequency features that iterative solvers excel at. 
+
+Recognizing this complementarity, HINTS \autocite{zhang2024blending} proposes a hybrid solver that leverages the advantages of traditional iterative methods and neural operators  to learn a wide range of eigenmodes more uniformly and quickly. It achieves this by periodically incorporating predictions from a neural operator into iterative updates of the traditional solver. While HINTS observes significant empirical performance improvements in convergence and accuracy when compared to using the standalone neural operator and Jacobi solver, the algorithm's fixed number of solver iterations between neural operator passes can be viewed as wasteful if the high frequency errors are overly dampened, or insufficient if not dampened enough. Furthermore, when HINTS employs multigrid methods, they are often restricted to cycle patterns, i.e. V cycle or W cycle, of fixed depths making it difficult to adapt cycle patterns in response to the distribution of errors across the learned eigenmodes.
+% We propose a model-based router that
+
+We present Adaptive HINTS which borrows ideas from learning to defer to make both the number of iterations of the traditional solver and the number of discretization levels in the multigrid solver adaptive to the distribution of spectral errors. It does so using a router that guides the collaboration between the neural operators and the various multigrid solvers, ensuring uniform convergence across frequencies. We propose loss functions for training a router wrapper for pretrained neural operators and joint training of the neural operators and router. The joint training approach makes the Neural Operator focus on learning eigenmodes that the iterative solvers struggle to capture. Additionally, this loss function incorporates the computational cost of each solver, ensuring optimal convergence under user-defined time budget constraints.
+
+% with the time cost of an iteration of jacobi solver and a neural operator pass in mind. 
+% can be useful in predicting the evolution of a system through simulation, solving control and optimization problems, and solve inverse problems based on external measurements. 
+% Modeling and understanding natural phenomena and engineered systems often boils down to solving differential equations. `
+% \begin{itemize}
+%     \item \st{Para 1: Explain the importance of solving PDEs}
+%     \item \st{Para 2: introduce numerical methods but it's expensive and the iterative method must be run each time the conditions change.}
+%     \item \st{Para 3: Introduce neural operators. but spectral bias}
+%     \item \st{Para 4: talk about HINTs vaguely but what might be some issues with it cost-accuracy tradeoff}
+%     \item Goals of proposed method: Principled guided collaboration between the numerical solver and the neural operator to ensure faster convergence of multigrid methods. This guided collaboration includes learning when to switch to 
+%     \item Goal: make the neural operator aware of this collaboration and focus it's training on low frequency modes  which it does anyway but perhaps focus on low frequency modes that can't be captures with the multigrid system. So learn the weakenesses of the solvers and work around it.
+%     \item 
+%     \item \st{(Stretch Goal) some theoretical results characterizing spectral bias}
+% \end{itemize}
+
+
+\section{Problem Setting and Background} \label{sec:background}
+
+Let $\mathcal{A} = \{a: D \to \mathbb{R}^d\}$ be an infinite-dimensional Banach space of coefficient functions, $\mathcal{F} = \{f: D \to \mathbb{R}^o\}$ be an infinite-dimensional Banach space of coefficient functions and $\mathcal{U} = \{u: D \to \mathbb{R}^m\}$ be the infinite dimensional Banach space of output functions where $D \subseteq \mathbb{R}^n$ is the spatial domain. Let's consider the following Linear PDE:
+\begin{equation} \label{eq:mainpde}
+    \begin{split}
+    \mathcal{L}_{x}^a\left(u\right) &= f ,x \in D \\
+    \mathcal{B}_{x}\left(u\right) &= g ,x \in \partial D
+    \end{split}
+\end{equation}
+% $$\mathcal{L}_{x}\left(u;k\right) = f$$
+where $\mathcal{L}_x^a$ is a differential operator with respect to the spatial variable $x \in D$ parameterized by $a \in \mathcal{A}$,  $f \in \mathcal{F}$ is an external forcing function,  $u \in \mathcal{U}$ is the solution to the PDE, $\mathcal{B}_{x}$ is the boundary operator, and $g$ is the boundary term .  
+
+PDEs of this form can be solved using a variety of numerical methods, including finite difference, finite element, spectral methods \autocite{boyd2001chebyshev,canuto2006spectral}, and neural operators. In this paper, however, we focus specifically on establishing efficient collaborations between iterative or multigrid solvers from finite difference discretizations and neural operators.
+
+\subsection{Finite Difference Methods} \label{sec:finitedifference}
+
+Finite difference methods \autocite{smith1985numerical,leveque2007finite} represent a class of numerical methods that approximate solutions to partial differential equations by replacing partial derivatives with discrete differential quotients. For example, the first derivative can be approximated as $\frac{\partial u(x)}{\partial x} \approx \frac{u(x + h) - u(x)}{h}$. When the entire domain is discretized,  evaluating the solution to the PDE $u$ at these grid points reduces to solving a system of algebraic equations or $Au = b$. While direct methods like Gauss Elimination and Thomas Algorithm are often employed to approximate the solution to such systems of equations, they can be computationally expensive in high-dimensional domains. In contrast, iterative methods like Jacobi and Gauss-Seidel provide computational speedups by iteratively updating the solution, gradually converging to the true solution for the PDE. 
+
+However, convergence is often slower on low frequency components of the solution. Multigrid solvers \autocite{briggs2000multigrid,trottenberg2001multigrid,hackbusch2013multi} tackle this problem by allowing high frequency error components to be sufficiently dampened on a finer discretization and leaving the smooth parts of the error to a coarser grid where low frequency function appear high frequency. 
+
+Let $A_h, A_{2h}$ represent the coefficient matrix on a fine grid with discretization parameter $h$ and $2h$, $u_h$ and $f_h$ represent the PDE solution and constant vector on a grid discretized by $h$, $R^{2h}_h$ denote the restriction matrix which transfers vectors from a fine grid to a coarse one, and $I^{h}_{2h}$ is the interpolation matrix transfers vectors from a coarse grid to a fine one. In a 2-grid method, a few iterations of the smoother (e.x. Jacobi or Gauss-Seidel) are first applied on the fine grid to approximate the solution of $A_hu_h = f_h$. The residual is then computed as $r_h = f_h - A_hu_h$ and restricted to the coarse grid via $r_{2h} = R^{2h}_hr_h$. The error equation, $A_{2h}e_{2h} = r_{2h}$, is solved on the coarse grid. The resulting estimate of the error is interpolated in the fine grid by $e_h = I^{h}_{2h}e_{2h}$, and the fine grid solution is updated by adding this correction, $u_h = u_h + e_h$. Finally, additional smoothing steps are performed on the fine grid to further reduce any high frequency errors. 
+
+More complex strategies for multigrid like V-cycle and W-cycle compute error corrections recursively across multiple grids of varying coarseness (See \Cref{sec:multigrid} for pseudocode of these methods).
+
+
+
+\subsection{Neural Operators} \label{sec:neuraloperators}
+
+Suppose we have some observations $\{(a_i, f_i, u_i)\}_{i = 1}^N$ such that $(a_i, f_i) \sim \mathcal{P}_{\mathcal{A} \times \mathcal{F}}$ are i.i.d. samples drawn from some distribution. Let $u_i$ is generated using a deterministic solution operator called $\mathcal{G}^{*} : \mathcal{A} \times \mathcal{F} \to \mathcal{U}$ such that $u_i = \mathcal{G}^{*}(a_i, f_i)$. Assuming a Lebesgue measure over the domain $D$, for a given pair of $(a_i, u_i, f_i)$, neural operators  $\mathcal{G}_{\theta}$ seek to approximate the true solution operator $\mathcal{G}^*$ by considering the following loss:
+\begin{equation} \label{eq:NOloss}
+    l_{\text{NO}}(a_i, f_i, u_i, \mathcal{G}_{\theta}) = \left\|u_i - \mathcal{G}_{\theta}(a_i, f_i)\right\|^2_{\mathcal{U}} = \int_{D} \left\|u_i(x) - \mathcal{G}_{\theta}(a_i, f_i)(x)\right\|_2^2dx
+\end{equation}
+
+The risk of this loss function is denoted by $\mathcal{R}_{\text{NO}}(\mathcal{G}_{\theta}) = \mathbb{E}_{(a, f) \sim  \mathcal{P}_{\mathcal{A} \times \mathcal{F}}}\left[l_{\text{NO}}(a, f, \mathcal{G}^{*}(a, f), \mathcal{G}_{\theta})\right] = \mathbb{E}_{(a, f) \sim  \mathcal{P}_{\mathcal{A} \times \mathcal{U}}}\left[l_{\text{NO}}(a, f, u, \mathcal{G}_{\theta})\right]$. Ideally, $\mathcal{G}_{\theta}$ would minimize $\mathcal{R}_{\text{NO}}(\mathcal{G}_{\theta})$.
+
+In classical PDE theory, if $\mathcal{L}_{x}^a$ is a linear operator, the Green's function \autocite{stakgold2011greens} $G: D \times D \to \mathbb{R}^m$ is the solution for $\mathcal{L}_{x}^aG(x, .) = \delta_x$ and the solution function takes the following form: $u(x)_j =\int_D G(x, y)_j f(y)_jdy$. Inspired by this, neural operators \autocite{kovachki2023neural} replace the traditional linear layer with a linear operator in the form of a kernel integral transform, $(\mathcal{K}v)(x) = \int_{D}\kappa(x, y)v(y)d\nu_t(y)$, mimicking the actions of Green's functions in a learnable way.  A single neural operator layer that maps a function $v_t: D \to \mathbb{R}^{d_t}$ to function $v_{t + 1}: D \to \mathbb{R}^{d_{t + 1}}$. This mapping takes the following form: $$v_{t + 1}(x) = \sigma_t\left(W_tv_t(x) + (\mathcal{K}_tv_t)(x) + b_t(x)\right)$$ for every $x \in D_{t + 1}$ where $W_t \in \mathbb{R}^{d_{t + 1} \times d_{t}}$ are matrices performing a local linear operation (discretization invariant), $\mathcal{K}_t: \{v_t: D \to \mathbb{R}^{d_{t + 1}}\} \to \{v_{t + 1}: D \to \mathbb{R}^{d_{t + 1}}\}$ are global kernel integral operators, $b_t: D \to \mathbb{R}^{d_{t + 1}}$ are bias functions which are often constant, and $\sigma_t$ is a fixed pointwise activation function mapping from $\mathbb{R}^{d_{t + 1}}$ to $\mathbb{R}^{d_{t + 1}}$.
+
+% The architecture of a neural operator is inspired by the behavior of a Green's function $G: D \times D \to \mathbb{R}^m$. If $L_a$ is a linear operator, the Green's function is the solution for $L_aG(x, .) = \delta_x$ and the solution function takes the following form: $u(x)_j =\int_D G(x, y)_j f(y)_jdy$.
+
+The architecture of the neural operator is discretization-invariant, a property that is clear in the parameterization of $W_t$ and $b_t$. However, a variety of discretization-invariant kernel parameterizations and kernel integral approximation strategies have given rise to many different variants of neural operators.  
+% Different variants of neural operators arise from the choice of kernel parameterization and the approximation strategy used to compute the integral. 
+For example, Fourier Neural Operators \autocite{li2020fourier} parameterize the kernel in the Fourier domain and use convolutions to characterize the integral. Graph Neural Operators \autocite{li2020multipole} compute the integral over a subdomain using the Nystrom's approximation. Prior to the rise of neural operators, DeepONets \autocite{lu2021learning} were a popular deep learning approach to operator learning. They can also be viewed a neural operator that uses a pointwise kernel with a discretized integral operator. 
+% But, a variety of discretization-invariant kernel parameterizations and approximations have led to many variants of neural operators.
+% In the kernel integration step, if we assume that $ D_t \equiv D_{t + 1} \equiv D$ and $\{x_1, \dots x_J\} \subset D$ are uniform samples from $D$, $(\mathcal{K}_tv_t)(x_j)$ is approximated by
+% $$\frac{1}{J}\sum_{l = 1}^J \kappa(x_j, x_l)v(x_l)$$. With this discretization, $K_t \in \mathbb{R}^{d_{t + 1}J \times d_{t}J}$ which is a $J \times J$ block matrix such that $K_{jl} = \kappa(x_j, x_l) \in \mathbb{R}^{d_{t + 1} \times d_t}$. This kernel intergration approximation step is $O(J^2d_{t + 1}d_t)$ which becomes quite intractable as $J$ becomes large. Various types of neural operators come from the different methods used to can approximate $\mathcal{K}_t$ derived based on structural assumptions made about the matrix. Since the computations involving $W_t, b, \sigma$ are $O(J)$, the focus of these types of neural operators has been to speed up the approximation of the kernel integration step.
+
+% Under some general conditions for $L_a$, we can define a Green's function $G: D \times D \to \mathbb{R}^m$ where $L_a G(x, .) = \delta_x $. If $u(x) = \int_D G(x, y) f(y)dy$, then
+
+% \begin{align*}
+%     (L_au)(x) &= \int_D (L_aG)(x, y) f(y)dy \\
+%     &= \int_D \delta_x f(y)dy \\ 
+%     &= f(x)
+% \end{align*}
+
+
+\subsection{Spectral Bias} \sahana{might remove}
+
+Spectral bias \autocite{rahaman2019spectral}, also known as F-principle \autocite{xu2019frequency}, refers to the tendency of neural networks to learn low-frequency components of a function faster than high-frequency components during training. While the original authors for the spectral bias and F-principle primarily studied empirical manifestations of this phenomenon, theoretical work \autocite{luo2019theory} shows that networks with arbitrary number of layers and width initially have larger loss gradients for low-frequency components with respect to the Fourier basis, causing them to prioritize learning the smooth components of the true mapping. 
+
+Even in the Neural Tangent Kernel regime where networks are infinitely wide, spectral bias has been proven to persist \autocite{cao2019towards}. This has also been observed in neural operators \autocite{liu2021multiscale,liu2024mitigating,you2024mscalefno,khodakarami2025mitigating,xu2025understanding} where during early training, the model learns to output low-frequency parts of the output functions. A spectral decomposition of the loss described in \Cref{eq:NOloss} makes it easy to disentangle the errors associated with low- and high-frequency parts. Regardless of the exact $a$ and $f$, the solution space of this PDE takes on general form - $u(x) = \sum_{k}\widehat{u}(k) \phi_k(x)$ where $\{\phi_k(x)\}$ are the eigenfunctions of the Fourier basis and $\widehat{u}(k) = \left<u(x), \phi_k(x)\right> = \int_D u(x)\phi_k(x)dx$. These coefficients $\widehat{u}(k)$ vary with the different instantiations of $a$ and $f$. 
+
+Accordingly, $l_{\text{NO}}$ can be expressed in terms of the eigenfunction coefficients. Using the orthonormality of the eigenfunctions, we obtain:
+
+\begin{align*}
+    l_{\text{NO}}(a_i, f_i, u_i, \mathcal{G}_{\theta}) &= \int_{D} \left\|\sum_{k = 1}^{\infty}\widehat{u}(k) \phi_k(x) - \sum_{k = 1}^{\infty}\widehat{u}_{\theta}(k) \phi_k(x)\right\|_2^2dx \\
+    % &= \int_{D} \left\|\sum_{i = 1}^{\infty} \left(c_i -\widehat{c}_i \right)\phi_i(x)\right\|^2_2dx \\
+    &= \int_{D} \sum_{k = 1}^{\infty} \left(\widehat{u}(k) -\widehat{u}_{\theta}(k) \right)^2\|\phi_k(x)\|^2_2 + \sum_{j \neq k} \left(\widehat{u}(j) -\widehat{u}_{\theta}(j) \right)\left(\widehat{u}(j) -\widehat{u}_{\theta}(j) \right)\phi_k(x)^{\top}\phi_j(x)dx \\
+    % &=  \sum_{i = 1}^{\infty} \left(c_i -\widehat{c}_i \right)^2 \int_{D}\|\phi_i(x)\|^2_2dx + \sum_{j \neq i} \left(c_i -\widehat{c}_i \right)\left(c_j -\widehat{c}_j \right)^2 \int_{D}\phi_i(x)^{\top}\phi_j(x)dx \\
+    &= \sum_{k = 1}^{\infty} \left(\widehat{u}(k) -\widehat{u}_{\theta}(k) \right)^2
+\end{align*}
+
+
+% Assuming a Lebesgue measure over the domain $D$, neural operators  $\mathcal{G}_{\theta}$ aim to approximate the true solution operator $\mathcal{G}^*$ by minimizing the following loss:
+% \begin{align*}
+%     l_{\text{NO}}(a, \mathcal{G}_{\theta}, \mathcal{G}^*) = \left\|\mathcal{G}^*(a) - \mathcal{G}_{\theta}(a)\right\|^2_{\mathcal{U}} = \int_{D} \left|\mathcal{G}^*(a)(x) - \mathcal{G}_{\theta}(a)(x)\right|^2dx
+% \end{align*}
+% \begin{align*}
+%     \mathbb{E}_{a \sim \mathcal{P}}\left[\left\|\mathcal{G}^*(a) - \mathcal{G}_{\theta}(a)\right\|^2_{\mathcal{U}}\right] &= \int_{\mathcal{A}} \left\|\mathcal{G}^*(a) - \mathcal{G}_{\theta}(a)\right\|^2_{\mathcal{U}} d\mu(a) 
+% \end{align*}
+% where $\|f\|^2_{\mathcal{U}} = \int_{D} |f(x)|^2dx$
+
+% \subsection{Learning to Defer}
+
+% \subsection{Greedy Optimization of Sequence functions}
+
+
+
+
+\section{General framework for Hybrid Solvers}
+
+
+Let $h$ be a fixed grid size and let an $h$-grid over the bounded domain $D \subseteq \mathbb{R}^n$  be $G_h(D) := \{\mathbf{k}h : \mathbf{k} \in \mathbb{Z}^n, \mathbf{k}h \in D\}$. We denote a restriction of the function $g: D \to \mathbb{R}$ to the grid $G_h(D)$ as $g_h := g(x) \Big\vert_{G_h(D)}$ and this can be interpreted as $g_h := \begin{bmatrix}
+    g(x_1) & \cdots & g(x_{|G_h(D)|})
+\end{bmatrix}^{\top} \in \mathbb{R}^{|G_h(D)|}$ for $x_1, x_2, \cdots, x_{|G_h(D)|} \in G_h(D)$. If $N = |G_h(D)|$, the discretized version of \Cref{eq:mainpde} is expressed as:
+\begin{equation} \label{eq:mainpdediscrete}
+    \mathcal{L}_h^au_h = f_h
+\end{equation}
+where $\mathcal{L}_h^a$ is an $N \times N$ matrix, reducing the PDE reduced to a linear system of equations. To solve \Cref{eq:mainpdediscrete}, we can consider the following hybrid solver. At each time step $t + 1$, the update is given by:
+\begin{equation}
+     u^{\left(t + 1\right)}_h = u^{\left(t\right)}_h + C_{S_t}\left(f_h - \mathcal{L}_h^au^{\left(t \right)}_h\right)
+\end{equation}
+where $\mathcal{C} =\{C_{j}\}_{j = 1}^K$ denotes the set of $K$ available solvers indexed by $j \in [1, K]$, and the index $j$ may change with time. 
+
+\begin{example}[HINTS] In the case of HINTS, the hybrid solver has access to two solvers ($K = 2$):  $C_1$ is a neural operator, and $C_2$ denotes either a weighted Jacobi solver, or a multigrid solver. The routing decision is determined by $$S_t = \mathds{1}\left[t \bmod \tau > 0\right] + 1$$
+which selects $C_1$ every $\tau$ steps and $C_2$ otherwise.
+\end{example}
+
+If the error at time step $t + 1$ is denoted by $e^{(t + 1)}_h = u_h - u^{\left(t + 1\right)}_h$, the the update rule can be written in terms of the error from the previous step:
+\begin{align*}
+    e^{(t + 1)}_h = u_h - u^{\left(t + 1\right)}_h &= u_h -  u^{\left(t\right)}_h -C_{S_t}\left(\mathcal{L}_h^au_h - \mathcal{L}_h^au^{\left(t\right)}_h\right)  \\
+    &= e^{(t)} - C_{S_t}\left(\mathcal{L}_h^a\left(u_h-u^{\left(t\right)}_h\right)\right) \\
+    &= e^{(t)} - C_{S_t}\mathcal{L}_h^ae^{(t)}
+\end{align*}
+
+% The error after $T$ steps becomes:
+% \begin{align*}
+%     e^{(T)}_h = \left(I_N - C_{S_T} \mathcal{L}_h^a\right) \cdots \left(I_N - C_{S_1} \mathcal{L}_h^a\right)  e^{(0)}_h 
+% \end{align*}
+% where $I_N$ is the identity matrix. 
+
+The objective of the hybrid solver is to select a sequence of solvers at each time that minimize the error norm after $T$ steps. Formally, we seek to solve 
+\begin{equation} \label{eq:errorobjective}
+    \min_{S \in [1, K]^*, |S| \leq T} h(S) \quad \text{subject to} |S| \leq T
+\end{equation}
+where the objective function $h(S)$ is defined as
+\begin{equation} \label{eq:errorobjective2}
+    h(S) = \left\|\prod_{t = |S|}^1\left(I_N - C_{S_t} \mathcal{L}_h^a\right)  e^{(0)} \right\|^2_2
+\end{equation}
+
+If running each solver $C_{j}$ incurs a time cost $c_j$, we can formulate a budget constrained optimization problem
+\begin{align*}
+    \min_{S \in [1, K]^*} & h(S) \\
+    \text{subject to} \quad &\sum_{t = 1}^T c_{i_t} \leq B
+\end{align*}
+
+where $B$ is the total computational budget.
+
+\section{Greedy Algorithm} \label{sec:greedy}
+
+\Cref{eq:errorobjective} defines a non-convex and combinatorial optimization problem whose search space grows exponentially in the time horizon $T$, rendering exact solutions computationally intractable for large $T$ or $K$. However, if the objective function satisfies supermodularity and monotonicity, a greedy algorithm -- such as the one described in \Cref{alg:greedy} -- can achieve solutions provably close to the optimal.
+
+Supermodularity, also known as the increasing differences property, characterizes the idea that appending an element earlier in a sequence has a larger marginal effect than doing so later. The suboptimality of the greedy algorithm under various structural conditions (i.e. submodularity, monotonicity) has been extensively studied for both minimization \cite{liberty2017greedy,bounia2023approximating}  and maximization \cite{nemhauser1978analysis,das2018approximate,feige2011maximizing,bian2017guarantees,harshaw2019submodular} of set functions. However, these classical results are limited to permutation-invariant objective functions, where the function value doesn't depend on the order of the elements. In contrast, results on the suboptimality of greedy sequence maximization \cite{streeter2008online,alaei2021maximizing,zhang2015string,bernardini2020through,van2024performance,tschiatschek2017selecting} -- where the ordering of the elements affects the function -- have led to various definitions of submodularity and monotonicity in sequential settings. In this work, we leverage some of those tools to analyze the suboptimality of greedy solution for sequence minimization such as \Cref{eq:errorobjective}.
+
+\begin{algorithm} 
+\caption{Greedy Algorithm}\label{alg:greedy}
+\begin{algorithmic}
+\Require $\{C_{j}\}_{j = 1}^{K}, T, \mathcal{L}_h^a, e^{(0)}$
+\State $S^{(0)} \gets \varnothing$
+\For{$t \leq T$}
+    \State $S^{(t + 1)} \gets S^{(t)} \ \oplus \text{argmin}_{j \in [K]}\left\|\left( I_N - C_{j} \mathcal{L}_{h}\right)e^{(t)}\right\|^2_2$
+    \State $e^{(t + 1)} \gets \left(I_N - C_{S_{t+ 1}} \mathcal{L}_{h}\right)e^{(t)}$
+\EndFor
+\State \Return $S^{(T)}$
+\end{algorithmic}
+\end{algorithm}
+
+
+% \section{Block wise Coordinate descent algorithm}
+
+% \section{$l$-step Lookahead algorithm}
+
+\subsection{Suboptimality of Greedy Sequence Minimization}
+
+Let $\Omega^*$ represent the space of sequences with each element in $\Omega$. Let $S = (S_1, \dots, S_n) \in \Omega^*$ and $S' = (S_1', \dots, S_m') \in \Omega^*$ be two sequences. We denote their concatenation as $S \oplus S' = (S_1, \dots, S_n, S_1', \dots, S_m')$. If $S' = S \ \oplus L$ where $L \in \Omega^*$, then $S$ is a prefix of $S'$ which is denoted as $S \preceq S'$. A sequence function $g: \Omega^* \to \mathbb{R}$ is considered prefix monotonically non-increasing if $g(S \ \oplus S') \leq g(S)$ for all $S, S' \in \Omega^*$. Similarly, $g$ is postfix monotonically non-increasing if $g(S' \ \oplus S) \leq g(S)$ for all $S, S' \in \Omega^*$. A function $g$ is considered sequence supermodular if $\forall S', S \in \Omega^*$ such that $S \preceq S'$, it holds that
+\begin{align*}
+    g(S) - g(S \ \oplus \omega ) \geq g(S') - g(S' \ \oplus \omega )
+\end{align*}
+
+\Cref{th:suboptgreedy} characterizes the suboptimality of greedy solutions to supermodular and monotonic sequence functions. 
+
+\begin{theorem} \label{th:suboptgreedy}
+    Let $g: \Omega^* \to \mathbb{R}$ be a prefix and postfix monotone sequence function with supermodularity. Let the greedy solution of length $T$ be $S^T$ and the optimal solution be $O$ such that $|O| \leq T$. Then,
+    \begin{equation*}
+        g(S^T) \leq \left(1 - \left(1 - \frac{1}{T}\right)^T\right)
+        g(O) +  \left(1 - \frac{1}{T}\right)^Tf(\varnothing)
+    \end{equation*}
+    Equivalently, 
+    \begin{equation*}
+        \frac{g(\varnothing) - g(S^T)}{g(\varnothing) - g(O)} \geq \left(1 - \left(1 - \frac{1}{T}\right)^T\right) \geq 1 - \frac{1}{e}
+    \end{equation*}
+\end{theorem}
+
+As $T \to \infty$, the factor $\left(1 - \left(1 - \frac{1}{T}\right)^T\right)$ in Theorem \Cref{th:suboptgreedy} decreases to $1 - \frac{1}{e}$, showing that the worst-case performance of the greedy algorithm saturates and does not degrade further with longer sequences.
+
+The applicability of \Cref{th:suboptgreedy} to designing a greedy hybrid solver depends on verifying that the sequence function $f$ satisfies both prefix, postfix monotonicity, and supermodularity.
+
+\begin{proposition} \label{th:monotonicity}
+    If $\|I_N - C_j\mathcal{L}_h\| \leq 1$ for all $j \in [K]$, $f$ is prefix monotonically non-increasing.
+\end{proposition}
+
+Proposition \ref{th:monotonicity} ensured that prefix monotonicity as long as no solver in the set amplifies errors. Any well-trained neural operator is expected to reduce the error norm, and traditional solvers such as Jacobi and Gauss-Seidel are known to exhibit this error-reducing property for linear elliptical PDEs under standard conditions. 
+
+While prefix monotonicity is generally applicable, postfix monotonicity and supermodularity arise in specific settings. A natural case occurs when the PDE of interest is linear with constant coefficients and periodic boundary conditions. Under these conditions, the error propagation matrices of classical solvers such as Jacobi and Gauss-Seidel exhibit a circulant structure making them both diagonalizable by the discrete Fourier transform matrix. Furthermore, when the learned neural operator is a single-layer Fourier Neural Operator without non-linearities, it too is a diagonalizable by the discrete Fourier basis. More generally, when the the error propagation matrices $\left(I - S_i \mathcal{L}_{h}\right)$ are simultaneously diagonalizable, i.e each admits a spectral decomposition with a shared eigenbasis, the original problem reduces to an allocation problem. Proposition \ref{th:blah} formalizes this reduction. 
+% Specifically, if $P^{-1}e^{(0)} = z^{(0)}$ and $\Lambda_j = \mathrm{diag}(\lambda_{j1}, \dots, \lambda_{jN})$, then \Cref{eq:errorobjective} can be rewritten as:
+\begin{proposition} \label{th:blah}
+     Let $\left(I - S_j \mathcal{L}_{h}\right) = P\Lambda_jP^{-1}$ where $P$ is an orthogonal matrix and $\Lambda_j = \mathrm{diag}(\lambda_{j1}, \dots, \lambda_{jN})$. If $P^{-1}e^{(0)} = z$, then the optimization problem presented in \Cref{eq:errorobjective} can be rewritten as:
+     \begin{equation} \label{eq:simultaneous}
+          \min_{\mathbf{m} \in \mathbb{N}^K} \sum_{j = 1}^N z_i^2 \prod_{k = 1}^K \lambda_{kj}^{2m_k} \qquad\mathrm{s.t}\qquad \sum_{k=1}^{K} m_k = T 
+     \end{equation}
+\end{proposition}
+
+This reduction is critical in analyzing the postfix monotonicity and supermodularity of the objective with simultaneously diagonalizable error propagation matrices.
+
+\begin{proposition} \label{th:simultaneous}
+    Let $\|I_N - C_j\mathcal{L}_h\| \leq 1$ for all $j \in [K]$ and $\left(I - C_j \mathcal{L}_{h}\right) = P\Lambda_jP^{-1}$. Then, $f$ is (i) postfix monotonically non-increasing and (ii) supermodular. 
+\end{proposition}
+
+To cover other PDEs and other solvers that don't satisfy simultaneous diagnolizability, we introduce weakly-$\alpha$-supermodularity for sequences. A sequence function is weakly-$\alpha$-supermodular if 
+\begin{equation*}
+     g(S) - g(S\ \oplus S') \leq \alpha T \max_{i \in [|S'|]} g(S) - g(S \ \oplus S'_i)
+\end{equation*}
+for any $S, S' \in \Omega^T$ such that $|S'| = T$. $\alpha \geq 1$. We define greedy curvature:
+
+\begin{equation*}
+    1 - \max_{S, S' \in \Omega^T, |S'| = T}\max_{i \in [|S'|]}\frac{f(S \ \oplus S') - f(S \ \oplus  S' \ \oplus S'_i)}{f(S) - f(S \ \oplus S'_i)}
+\end{equation*}. We define weak postfix monotonicity:
+
+\begin{equation*}
+    g(S' \ \oplus S) \leq \mu g(S)
+\end{equation*}
+
+\begin{theorem} \label{th:suboptgreedy2}
+    Let $g: \Omega^* \to \mathbb{R}$ be a prefix and $\mu$-postfix monotone sequence function with weak-$\alpha$-supermodularity. Let the greedy solution of length $T$ be $S^T$ and the optimal solution be $O$ such that $|O| \leq T$. Then,
+    \begin{equation*}
+        g(S^T) \leq \mu \left(1 - \left(1 - \frac{1}{\alpha T}\right)^T\right)
+        g(O) +  \left(1 - \frac{1}{\alpha T}\right)^Tf(\varnothing)
+    \end{equation*}
+    Equivalently, 
+    \begin{equation*}
+        \frac{g(\varnothing) - g(S^T)}{g(\varnothing) - g(O)} \geq \left(1 - \left(1 - \frac{1}{\alpha T}\right)^T\right) \geq 1 - \frac{1}{e^{\alpha}}
+    \end{equation*}
+\end{theorem}
+
+\begin{proposition} \label{th:generalmonotonicity}
+    Let $\|I_N - C_j\mathcal{L}_h\| \leq 1$ for all $j \in [K]$. Then, $f$ is weakly-$\alpha$-supermodular with $$\alpha = \max_{S: |S| = T}\frac{\left\|I_N - \prod_{j = T}^{1}\left(I_N - C_{S_i}\mathcal{L}_h\right)\right\|}{1 - \max_{i \in [T]}\|I_N - C_{S_i}\mathcal{L}_h\| }$$ 
+\end{proposition}
+
+
+\begin{corollary}[Suboptimality of HINTS]
+    
+\end{corollary}
+
+
+
+
+
+
+
+% \subsection{Special Case: Simultaneously Diagonalizable Error Propagation Operators} \label{sec:diagonalizableerror}
+
+% \Cref{eq:errorobjective} defines a non-convex and combinatorial optimization problem whose search space grows exponentially in the time horizon $T$, rendering exact solutions computationally intractable for large $T$ or $K$. However, under the simplifying assumption that all solvers $\mathcal{S}_i$ are linear and the error propagation matrices $\left(I - S_i \mathcal{L}_{h}\right)$ are simultaneously diagonalizable, i.e each admits a spectral decomposition with a shared eigenbasis, the original problem reduces to an allocation problem. Proposition \ref{th:blah} formalizes this reduction. 
+% % Specifically, if $P^{-1}e^{(0)} = z^{(0)}$ and $\Lambda_j = \mathrm{diag}(\lambda_{j1}, \dots, \lambda_{jN})$, then \Cref{eq:errorobjective} can be rewritten as:
+% \begin{proposition} \label{th:blah}
+%      Let $\left(I - S_j \mathcal{L}_{h}\right) = P\Lambda_jP^{-1}$ where $P$ is an orthogonal matrix and $\Lambda_j = \mathrm{diag}(\lambda_{j1}, \dots, \lambda_{jN})$. If $P^{-1}e^{(0)} = z$, then the optimization problem presented in \Cref{eq:errorobjective} can be rewritten as:
+%      \begin{equation*}
+%           \min_{\mathbf{m} \in \mathbb{N}^K} \sum_{j = 1}^N z_i^2 \prod_{k = 1}^K \lambda_{kj}^{2m_k} \qquad\mathrm{s.t}\qquad \sum_{k=1}^{K} m_k = T 
+%      \end{equation*}
+% \end{proposition}
+
+
+% This problem, as naively posited, again does not lend itself to an efficient solution strategy, as it is formulated over the integers. We, therefore, consider the natural convex relaxation of this problem, where we instead optimize $\mathbf{m} \in\mathbb{R}_{+}^{K}$. In other words, we consider the following relaxation:
+% \begin{equation}
+% \begin{aligned}
+%     \min_{\mathbf{m} \in\mathbb{R}^{K}}&\quad \sum_{j = 1}^N z_i^2 \prod_{k = 1}^K \lambda_{kj}^{2m_k}
+%     \qquad\mathrm{s.t}\qquad \sum_{k=1}^{K} m_k = T, \quad  \mathbf{m}\succeq 0
+% \end{aligned}
+% \end{equation}
+
+
+
+% \subsection{Suboptimality of HINTS}
+
+
+
+% \subsection{Suboptimality of Myopic Strategy}
+
+% \section{Case Study}
+
+% While the theory presented in \Cref{sec:diagonalizableerror} appears studies a very simple form of error propagation matrices, these matrices naturally appear when solving linear PDEs with constant coefficients and periodic boundary conditions using a Jacobi, Gauss Seidel, or Fourier linear operator solver.
+
+% \subsection{Spectral Analysis of HINTS}
+
+
+% To solve \Cref{eq:mainpde}, we can consider the following hybrid solver where:
+% \begin{align*}
+%     u^{\left(k + \frac{1}{2}\right)} &= u^{\left(k \right)} + B(f - \mathcal{L}_{\mathbf{x}}\left(u^{\left(k \right)}; a\right)) \quad \text{ $\tau$ iterations}\\
+%     u^{\left(k + 1\right)} &= u^{\left(k + \frac{1}{2}\right)} + \mathcal{G}\left(f - \mathcal{L}_{\mathbf{x}}\left(u^{\left(k + \frac{1}{2}\right)}; a\right)\right)
+% \end{align*}
+% where the operator $B$ depends on the choice of the numerical iterative solver, such as Jacobi, Gauss-Seidel, or Multigrid. The errors in the hyrbid solver propagate in the following manner:
+% \begin{equation}
+%     e^{(k+1)} = \left(I - \mathcal{G} \mathcal{L}_{\mathbf{x}}\right)\left(I - B \mathcal{L}_{\mathbf{x}}\right)^{\tau}e^{(k)} \label{eq:errorhybrid}
+% \end{equation}
+
+
+% Let $\mathcal{G}: \left\{D \to \mathbb{R}^u\right\} \to \left\{D \to \mathbb{R}^v\right\}$ be the Fourier linear operator such that:
+% $$\left(\mathcal{G}u\right)(x) = Wu(x) + (\mathcal{K}u)(x) + b(x)$$
+% where $(\mathcal{K}u)(x) =  \int_{D}K(x, y)u(y)dy$ is a kernel integral transform, and $K(x, y) = K(x - y): D \to \mathbb{R}^{v \times u}$ is translationally invariant. 
+
+% To understand the behavior of this hybrid solver, we turn to Local Fourier Analysis (LFA) \cite{brandt1977multi}. LFA is a powerful tool for understanding how numerical solvers act on different frequency components of the error. By analyzing the behavior of the error propagation operator on a per-frequency basis, LFA reveals how efficiently a method damps errors across the spectrum. When the solution function is defined on an infinite uniform grid or a periodic domain, the error propagation operator is linear and stationary (i.e., it remains fixed across iterations), and the coefficient function $a \in \mathcal{A}$ is a constant, LFA can be applied directly. Under these conditions, the error propagation operator can be diagonalized in a fourier basis, enabling explicit computation of amplification factor each mode. 
+
+\section{Approximate Greedy Router} \label{sec:approxgreedy}
+
+The results from \Cref{sec:greedy} indicate the error reduction achieved with the  greedy solution closely matches the of the optimal sequence. However, this greedy algorithm is predicated on having an accurate estimate of the initial error or $e^{(0)}$. A poor approximation of $e^{(0)}$ can result in miscalibrated decisions, with the approximation errors propagating and amplifying over subsequent steps. 
+
+To remedy this, we wish to design a router that learns to select solvers myopically, as described in \Cref{alg:greedy}, without access to the true initial error $e^{(0)}$. At each time step $t$, the router $r$ selects a solver based on the coefficient function $a \in \mathcal{A}$, forcing function $f \in \mathcal{F}$ and the current iterate of the solution function $u^{(t)} \in \mathcal{U}$. Assuming that the initial guess $u^{(0)}$ is a deterministic function of $a$ and $f$, it follows that the entire sequence $\{u^{(t)}\}$ is fully determined by $a$ and $f$, even though this dependence is implicit.
+% $u^{(t)}$ is a function of the initial guess of the solution function $u^{(0)} \sim \mathcal{P}_{\mathcal{U}}$ and 
+When $r(a, f, u^{(t)}) = j$, the solution function is passed onto the $j^{\text{th}}$ solver and this results in an error of $\left\|\left( I_N - C_{j} \mathcal{L}_{h}\right)e^{(t)}\right\|^2_2$. Learning such a router requires minimizing the following loss objective
+
+\begin{equation} \label{eq:routerloss}
+    l_{\text{route}}\left(r,\mathcal{C}, a, f, u^{(t)}, u\right) = \sum_{j = 1}^K \left\|\left( I_N - C_{j} \mathcal{L}_{h}\right)\left(u - u^{(t)}\right)\right\|^2_2\mathds{1}_{r(a, f, u^{(t)}) = j}
+\end{equation}
+
+The corresponding $l_{\text{route}}$-risk is defined as $\mathcal{R}_{\text{route}}\left(r,\mathcal{C}\right) = \mathbb{E}_{a, f \sim \mathcal{P}_{\mathcal{A} \times \mathcal{F}}}\left[l_{\text{route}}\left(r,\mathcal{C}, a, f, u^{(t)}, u\right)\right]$. Minimizing $\mathcal{R}_{\text{route}}\left(r\right)$ yields the following Bayes-Optimal Router:
+\begin{align*}
+    r^*(a, f, u^{(t)}) = \text{argmin}_{j \in [1, K]} \left\|\left( I_N - C_{j} \mathcal{L}_{h}\right)e^{(t)}\right\|^2_2
+\end{align*}
+
+which aligns with the decision rule in \Cref{alg:greedy}, confirming that $l_{\text{route}}$ is consistent with learning the greedy algorithm.
+
+\subsection{Surrogate Loss}
+
+Since \Cref{eq:routerloss} is discontinuous and non-convex, direct minimization is intractable in practice. To overcome this, we introduce a surrogate loss that satisfies two key properties: (1) it is convex, enabling efficient optimization, and (2) it is Bayes consistent, ensuring the Bayes optimal decision of the original loss is preserved upon minimization. Formally, a surrogate $\phi$ is considered to be Bayes consistent with respect to the loss $l$ if 
+\begin{equation*}
+    \lim_{n \to \infty} \mathcal{R}_{\phi}(f_n) - \mathcal{R}_{\phi}^* \implies \lim_{n \to \infty} \mathcal{R}_{l}(f_n) - \mathcal{R}_{l}^* 
+\end{equation*}
+where $\mathcal{R}_{l}(f) = \mathbb{E}\left[l(f(X), Y)\right]$ and $\mathcal{R}_{l}^* = \inf_f\mathcal{R}_{l}(f)$. In other words, in the limit of infinite data, if a sequence of learned hypotheses $\{f_n\}$ converges to the optimal risk under $\phi$, it also converges to the optimal risk with respect to the originla loss$l$.
+
+To define a surrogate loss for the routing problem, consider a set of scoring functions $\mathbf{g} =\{g_j\}_{j = 1}^K$ with $g_j: \mathcal{A} \times \mathcal{F} \times \mathcal{U} \to \mathbb{R}$ and we define the router as $r(a, f, u^{(t)}) = \text{argmax}_{j \in [1, K]} g_j(a, f, u^{(t)})$. Then, minimizing the following surrogate loss yields the same decision as minimizing \Cref{eq:routerloss}:
+\begin{equation} \label{eq:routersurrogate}
+    \Psi\left(\mathbf{g}, \mathcal{C}, a, f, u^{(t)}, u\right) = -\sum_{j = 1}^K \left(\Tilde{c}\left(a, f, u^{(t)}, u\right) -\left\|\left( I_N - C_{j} \mathcal{L}_{h}\right)e^{(t)}\right\|^2_2\right) \log\left(\frac{e^{g_j(a, f, u^{(t)})}}{\sum_{k = 1}^Ke^{g_k(a, f, u^{(t)})}}\right)% \psi\left(\mathbf{g}(a, f, u^{(t)}),j\right)
+\end{equation}
+
+where 
+% $\psi\left(\mathbf{g}(a, f, u^{(t)}),j\right)$ is a consistent surrogate for the multiclass $0/1$ loss and 
+$\Tilde{c}\left(a,f, u^{(t)}, u\right) = \max_{j \in [1, K]} \left\|\left( I_N - C_{j} \mathcal{L}_{h}\right)e^{(t)}\right\|^2_2$. The $\Psi$-risk is denoted by $\mathcal{R}_{\Psi}\left(\mathbf{g}, \mathcal{C}\right) = \mathbb{E}_{a, f \sim \mathcal{P}_{\mathcal{A} \times \mathcal{F}}}\left[\Psi\left(\mathbf{g}, \mathcal{C}, a, f, u^{(t)}, u\right)\right]$. 
+
+The convexity of $\Psi$ with respect to $\mathbf{g}$ follows from the fact that the log-softmax function is convex in its inputs. \Cref{th:consistency} shows that $\Psi$ achieves bayes consistency with respect to $l$
+
+\begin{theorem} \label{th:consistency}
+    Let $\left\|\left( I_N - C_{j} \mathcal{L}_{h}\right)e^{(t)}\right\|^2_2 < \Bar{E} < \infty$  for all $j \in [1, K]$. If there exists $j, k \in [1, K]$ such that $\left|\left\|\left( I_N - C_{k} \mathcal{L}_{h}\right)e^{(t)}\right\|^2_2 - \left\|\left( I_N - C_{j} \mathcal{L}_{h}\right)e^{(t)}\right\|^2_2\right| > \Delta > 0$, then, for any collection of solvers $\{C_j\}_{j= 1}^K$, $\Psi$ is Bayes consistent surrogate for $l_{\text{route}}$.
+\end{theorem}
+
+% is computationally infeasible due to its discontinuous and non-convex nature. This can be addressed by minimizing a convex surrogate loss that will result in the same outcome as minimizing the original loss.
+
+%and the router must pay a cost of $c_j$.  
+
+% If $e^{(0)}$ is approximated poorly, early miscalibrated decisions in solver selection can cascade through subsequent steps, degrading overall performance.  
+
+
+\section{Experimental Setup}
+
+
+\section{Notes}
+
+\paragraph{Difficulty of finite sample guarantees:} If we know that $f(S \ \oplus r(S)) - \min_{\omega \in \Omega} f(S \ \oplus \omega) < \epsilon$ (can obtain this lower bound from the consistency bound), this doesn't guarantee that $f(Z^T)$ where $Z^T$ is constructed using $r$ such that $Z^T = r(\varnothing) \ \oplus r(Z_1) \ \oplus r(Z_2) \ \oplus \ \cdots \oplus r(Z_{T - 1})$ is lower bounded by the performance of the true greedy sequence $S^T$,
+
+\paragraph{Budget constraints:} There is some work on how to 
+
+\paragraph{$f$ is not needed for the router}
+\paragraph{can neural operator be a matrix?}
+
+\paragraph{check if the error norms are not spctrl radius}
+\printbibliography
+
+
+\appendix
+
+% \section{Theoretical Analysis of Jacobi} \label{sec:jacobianalysis}
+
+% $A$ is split into $A = D - L - U$ where $D$ is the Diagnonal parts of $A$, $U$ is the additive inverse of the upper triangle parts of $A$, and $L$ is the additive inverse of the lower triangle parts of $A$ (See \href{https://ocw.mit.edu/courses/16-920j-numerical-methods-for-partial-differential-equations-sma-5212-spring-2003/resources/lec6_notes/}{here} and \href{https://math.mit.edu/classes/18.086/2006/am62.pdf}{here} for references). Then, $(D - L - U)x = b$ or $Dx = (L + U)x + b$ which inspires the following update rule $x^{(j + 1)} = D^{-1}\left((L + U)x^{(j)} + b\right)$. Let $e^{(j)}$ be the iteration error or $x^{(j)} - x$. Then, $e^{(j + 1)} = D^{-1}(L + U)e^{(j)} = M_{Jac}e^{(j)}$. Generally, $e^{(j + 1)} = M_{Jac}^{j}e^{(1)}$
+
+\section{Proof of Theorem \ref{th:suboptgreedy}}
+
+This proof strategy is inspired by \cite{streeter2008online} and \cite{liberty2017greedy}
+
+\begin{proof}
+
+\begin{align*}
+    g(S^t) -g(O) &\overset{(a)}{\leq} g(S^t) -g(S^t\ \oplus O) \\
+    &=\sum_{i = 1}^{|O|} g(S^t \oplus \left(o_1, \dots o_{i - 1}\right)) -g(S^t\ \oplus \left(o_1, \dots, o_{i}\right))\\
+    &\overset{(b)}{\leq} \sum_{i = 1}^{|O|} g(S^t) -g(S^t\ \oplus  o_{i}) \\
+    &\leq |O|\max_{i \in [|O|]} g(S^t) -g(S^t\ \oplus  o_{i}) \\
+    &\leq  Tg(S^t) -  T\min_{\omega \in \Omega} g(S^t\ \oplus  \omega) \\
+    &= Tg(S^t) -  Tg(S^{t + 1}) \\
+    &= T \left(g(S^t) - g(O)\right) - T\left(g(S^{t + 1}) -g(O)\right) \\
+    g(S^{t + 1}) -g(O) &\leq \left(1 - \frac{1}{T}\right)\left(g(S^t) - g(O)\right)
+\end{align*}
+(a) by postfix monotonicity, (b) by supermodularity. 
+
+When recursively applying this inequality, we get:
+
+\begin{align*}
+     g(S^{T}) -g(O) &\leq \left(1 - \frac{1}{T}\right)^T\left(g(\varnothing) - g(O)\right)
+\end{align*}
+\end{proof}
+
+
+\section{Proof of Proposition \ref{th:monotonicity}}
+
+\begin{proof}
+
+Let $S \preceq S'$ where $S' = S \ \oplus N$.
+
+\begin{align*}
+    f(S') &= \left \|\prod_{t = |S'|}^1\left(I_N - C_{S'_t}\mathcal{L}_h\right) e^{(0)}\right\|^2_2 \\
+    &= \left \|\prod_{t = |S'|}^{|S| + 1}\left(I_N - C_{S'_t}\mathcal{L}_h\right)\prod_{t = |S|}^1\left(I_N - C_{S'_t}\mathcal{L}_h\right) e^{(0)}\right\|^2_2 \\
+    &\leq \prod_{t = |S'|}^{|S| + 1}\left \|\left(I_N - C_{S'_t}\mathcal{L}_h\right) \right\|^2_2 \left\|\prod_{t = |S|}^1\left(I_N - C_{S_t}\mathcal{L}_h\right) e^{(0)}\right\|^2_2 \\
+    &\leq f(S)
+\end{align*}
+
+\end{proof}
+
+\section{Proof of Proposition \ref{th:blah}}
+
+
+
+\begin{proof}
+
+\begin{align*}
+    \min_{\mathbf{i} \in [K]^T} \left\|\prod_{t = T}^1\left(I_N - S_{i_t} \mathcal{L}_{h}\right)  e^{(0)} \right\|^2 &= \min_{\mathbf{i} \in [K]^T} \left\|\prod_{t = T}^1\left(P\Lambda_{i_t}P^{-1}\right)  e^{(0)} \right\|^2 \\
+    &= \min_{\mathbf{i} \in [K]^T} \left\|P\prod_{t = T}^1\Lambda_{i_t}P^{-1}  e^{(0)} \right\|^2 \\
+    &= \min_{\mathbf{i} \in [K]^T} \left\|\prod_{t = T}^1\Lambda_{i_t}P^{-1}  e^{(0)} \right\|^2\\
+    &= \min_{\mathbf{i} \in [K]^T} \sum_{j = 1}^N z_i^2 \prod_{t = T}^1 \lambda_{i_Tj} \\
+    &= \min_{\mathbf{m} \in \mathbb{N}^K} \sum_{j = 1}^N z_i^2 \prod_{k = 1}^K \lambda_{kj}^{2m_k} \qquad\mathrm{s.t}\qquad \sum_{k=1}^{K} m_k = T \\
+    % &= \min_{\mathbf{m} \in\mathbb{N}^{K}}\quad \sum_{j = 1}^N z_i^2 \exp \left\{\sum_{k = 1}^K m_k \log \lambda_{kj}^{2}\right\}
+    % \qquad\mathrm{s.t}\qquad \sum_{k=1}^{K} m_k = T
+\end{align*}
+
+\end{proof}
+
+\section{Proof of Proposition \ref{th:simultaneous}}
+
+\begin{proof}
+
+\begin{enumerate}
+    \item[(i)] Let $S \preceq S'$ where $S' = S \ \oplus B$. If two matrices are simultaneously diagonalizable, they are also commuting.
+\begin{align*}
+    f(S') &= \left \|\prod_{t = |S'|}^1\left(I_N - C_{S'_t}\mathcal{L}_h\right) e^{(0)}\right\|^2_2 \\
+    &= \left \|\prod_{t = |S'|}^{|S| + 1}\left(I_N - C_{S'_t}\mathcal{L}_h\right)\prod_{t = |S|}^1\left(I_N - C_{S'_t}\mathcal{L}_h\right) e^{(0)}\right\|^2_2 \\
+    &= \left \|\prod_{t = |S|}^1\left(I_N - C_{S'_t}\mathcal{L}_h\right)\prod_{t = |S'|}^{|S| + 1}\left(I_N - C_{S'_t}\mathcal{L}_h\right) e^{(0)}\right\|^2_2 \\
+    &\leq  \prod_{t = |S|}^1  \left\|\left(I_N - C_{S'_t}\mathcal{L}_h\right) \right\|^2_2 \left\|\prod_{t = |B|}^{1}\left(I_N - C_{B_t}\mathcal{L}_h\right) e^{(0)}\right\|^2_2 \\
+    &\leq f(B)
+\end{align*}
+
+\item[(ii)] Let $S \preceq S'$ where $S' = S \ \oplus B$. By Proposition \ref{th:blah},
+\begin{align*}
+    f(S) &= \sum_{j = 1}^N z_j^2 \prod_{k = 1}^K \lambda_{kj}^{2\sum_{i = 1}^{|S|} \mathds{1}\left[S_i = k\right]}
+\end{align*}
+Let $\Tilde{S}_k = \sum_{i = 1}^{|S|} \mathds{1}\left[S_i = k\right]$ be the number of times a sequence $S$ calls the solver $k$. Recall that $f$ is considered sequence supermodular if $\forall S', S \in \Omega^*$ such that $S \preceq S'$, it holds that
+\begin{align*}
+    f(S) - f(S \ \oplus \omega ) \geq f(S') - f(S' \ \oplus \omega )
+\end{align*}
+Without loss of generality, let's assume that $\omega$ that will be appended to $S, S'$ is $1$.
+\begin{align*}
+    f(S) - f(S \ \oplus \omega) &= \sum_{j = 1}^N z_j^2 \prod_{k = 1}^K \lambda_{kj}^{2\Tilde{S}_k} - \sum_{j = 1}^N z_j^2 \lambda_{\omega j}^{2}\prod_{k = 1}^K \lambda_{kj}^{2\Tilde{S}_k} \\
+    &=  \sum_{j = 1}^N \left(1 - \lambda_{\omega j}^2\right) z_j^2 \prod_{k = 1}^K \lambda_{kj}^{2\Tilde{S}_k}
+\end{align*}
+Similarly, 
+\begin{align*}
+    f(S') - f(S \ \oplus \omega) &= \sum_{j = 1}^N \left(1 - \lambda_{\omega j}^2\right) z_j^2 \prod_{k = 1}^K \lambda_{kj}^{2\Tilde{S}'_k} \\
+    &\overset{(a)}{=}  \sum_{j = 1}^N \left(1 - \lambda_{\omega j}^2\right) z_j^2 \prod_{k = 1}^K \lambda_{kj}^{2\left(\Tilde{S}_k + \Tilde{B}_k\right)} \\
+    &\overset{(b)}{\leq } \sum_{j = 1}^N \left(1 - \lambda_{\omega j}^2\right) z_j^2 \prod_{k = 1}^K \lambda_{kj}^{2\Tilde{S}_k} \\
+    &= f(S) - f(S \ \oplus \omega)
+\end{align*}
+
+
+(a) Since $\Tilde{S}_k = \sum_{i = 1}^{|S'|} \mathds{1}\left[S_i' = k\right] = \sum_{i = 1}^{|S|} \mathds{1}\left[S_i' = k\right] + \sum_{i = |S|}^{|S'|} \mathds{1}\left[S_i' = k\right] = \sum_{i = 1}^{|S|} \mathds{1}\left[S_i = k\right] + \sum_{i = 1}^{|B|} \mathds{1}\left[B = k\right] = \Tilde{S}_k + \Tilde{B}_k$, (b) since $\rho(I_N - C_j \mathcal{L}_h) < 1$ and $\Tilde{B}_k \geq 0$ for all $k \in [K]$
+
+
+\end{enumerate}
+
+
+\end{proof}
+
+\section{Proof of Theorem \ref{th:suboptgreedy2}}
+
+This proof strategy is inspired by \cite{streeter2008online} and \cite{liberty2017greedy}
+
+\begin{proof}
+
+\begin{align*}
+    g(S^t) -g(O) &\overset{(a)}{\leq} g(S^t) - \frac{1}{\mu}g(S^t\ \oplus O) \\
+    &= \left(1 - \frac{1}{\mu}\right)g(S^t) + \frac{1}{\mu}\left(g(S^t) - g(S^t\ \oplus O)\right) \\
+    &=\left(1 - \frac{1}{\mu}\right)g(S^t) + \frac{1}{\mu}\sum_{i = 1}^{|O|} g(S^t \oplus \left(o_1, \dots o_{i - 1}\right)) -g(S^t\ \oplus \left(o_1, \dots, o_{i}\right))\\
+    &\overset{(b)}{\leq} \left(1 - \frac{1}{\mu}\right)g(S^t) + \frac{\alpha}{\mu}\sum_{i = 1}^{|O|} g(S^t) -g(S^t\ \oplus  o_{i}) \\
+    &\leq \left(1 - \frac{1}{\mu}\right)g(S^t) + \frac{\alpha|O|}{\mu}\max_{i \in [|O|]} g(S^t) -g(S^t\ \oplus  o_{i}) \\
+    &\leq  \left(1 - \frac{1 - \alpha T}{\mu}\right)g(S^t) -  \frac{\alpha T}{\mu}\min_{\omega \in \Omega} g(S^t\ \oplus  \omega) \\
+    &=  \left(1 - \frac{1 - \alpha T}{\mu}\right)g(S^t) -  \frac{\alpha T}{\mu}g(S^{t + 1})
+    % &= Tg(S^t) -  Tg(S^{t + 1}) \\
+    % &= T \left(g(S^t) - g(O)\right) - T\left(g(S^{t + 1}) -g(O)\right) \\
+    % g(S^{t + 1}) -g(O) &\leq \left(1 - \frac{1}{T}\right)\left(g(S^t) - g(O)\right)
+\end{align*}
+(a) by $\mu$- postfix monotonicity, (b) by supermodularity. 
+
+After rearranging the inequality, we get:
+
+\begin{align*}
+    g(S^{t + 1}) &\leq \frac{\mu}{\alpha T}\left(g(O) -  \frac{1 - \alpha T}{\mu}g(S^t)\right) \\
+    &= \frac{\mu}{\alpha T}g(O) + \left(1 - \frac{1}{\alpha T}\right)g(S^t)
+\end{align*}
+
+When recursively applying this inequality, we get:
+
+\begin{align*}
+     g(S^{T}) &\leq \frac{\mu}{\alpha T}g(O)\sum_{i = 0}^{T - 1}\left(1 - \frac{1}{\alpha T}\right)^i + \left(1 - \frac{1}{\alpha T}\right)^Tg(\varnothing) \\
+     &= \mu \left(1 - \left(1 - \frac{1}{\alpha T}\right)^T\right)g(O) + \left(1 - \frac{1}{\alpha T}\right)^Tg(\varnothing)
+\end{align*}
+\end{proof}
+
+\section{Proof of Proposition \ref{th:generalmonotonicity}}
+
+\begin{proof}
+
+We will upper bound $\alpha$ by providing an upper bound for $ f(S) - f(S\ \oplus S') $ and a lower bound for $\max_i f(S) - f(S\ \oplus S'_i) $
+
+\begin{align*}
+    f(S) - f(S\ \oplus S') &=  \left \|\prod_{t = |S|}^1\left(I_N - C_{S_t}\mathcal{L}_h\right) e^{(0)}\right\|^2_2 -  \left \|\prod_{t = |S'|}^{1}\left(I_N - C_{S'_t}\mathcal{L}_h\right) \prod_{t = |S|}^1\left(I_N - C_{S_t}\mathcal{L}_h\right) e^{(0)}\right\|^2_2 \\
+    &\leq \left \|\prod_{t = |S|}^1\left(I_N - C_{S_t}\mathcal{L}_h\right) e^{(0)}-\prod_{t = |S'|}^{1}\left(I_N - C_{S'_t}\mathcal{L}_h\right) \prod_{t = |S|}^1\left(I_N - C_{S_t}\mathcal{L}_h\right) e^{(0)}\right\|^2_2 \\
+    &=  \left \| \left(I_N-\prod_{t = |S'|}^{1}\left(I_N - C_{S'_t}\mathcal{L}_h\right) \right) \prod_{t = |S|}^1\left(I_N - C_{S_t}\mathcal{L}_h\right) e^{(0)}\right\|^2_2 \\
+    &\leq  \left \| I_N-\prod_{t = |S'|}^{1}\left(I_N - C_{S'_t}\mathcal{L}_h\right) \right\|^2_2\left\| \prod_{t = |S|}^1\left(I_N - C_{S_t}\mathcal{L}_h\right) e^{(0)}\right\|^2_2
+\end{align*}
+
+To lower bound $\max_i f(S) - f(S\ \oplus S'_i) $
+\begin{align*}
+    \max_i f(S) - f(S\ \oplus S'_i) &= \left \|\prod_{t = |S|}^1\left(I_N - C_{S_t}\mathcal{L}_h\right) e^{(0)}\right\|^2_2 - \max_i \left \|\left(I_N - C_{S_i'}\mathcal{L}_h\right)\prod_{t = |S|}^1\left(I_N - C_{S_t}\mathcal{L}_h\right) e^{(0)}\right\|^2_2  \\
+    &\geq \left \|\prod_{t = |S|}^1\left(I_N - C_{S_t}\mathcal{L}_h\right) e^{(0)}\right\|^2_2 - \max_i \left \|I_N - C_{S_i'}\mathcal{L}_h\right\|\left\|\prod_{t = |S|}^1\left(I_N - C_{S_t}\mathcal{L}_h\right) e^{(0)}\right\|^2_2 \\
+    &= \left(1 - \max_i \left \|I_N - C_{S_i'}\mathcal{L}_h\right\|^2_2\right) \left \|\prod_{t = |S|}^1\left(I_N - C_{S_t}\mathcal{L}_h\right) e^{(0)}\right\|^2_2 
+\end{align*}
+
+Finally,
+
+\begin{align*}
+    \frac{f(S) - f(S\ \oplus S')}{T\max_i f(S) - f(S\ \oplus S'_i)} &\leq \max_{S, S' \in \Omega^T, |S'| = T}\frac{ \left \| I_N-\prod_{t = |S'|}^{1}\left(I_N - C_{S'_t}\mathcal{L}_h\right) \right\|^2_2\left\| \prod_{t = |S|}^1\left(I_N - C_{S_t}\mathcal{L}_h\right) e^{(0)}\right\|^2_2}{T\left(1 - \max_i \left \|I_N - C_{S_i'}\mathcal{L}_h\right\|^2_2\right) \left \|\prod_{t = |S|}^1\left(I_N - C_{S_t}\mathcal{L}_h\right) e^{(0)}\right\|^2_2 } \\
+    &= \max_{S' \in \Omega^T, |S'| = T}\frac{\left \| I_N-\prod_{t = |S'|}^{1}\left(I_N - C_{S'_t}\mathcal{L}_h\right) \right\|^2_2}{T - T\max_i \left \|I_N - C_{S_i'}\mathcal{L}_h\right\|^2_2}
+\end{align*}
+\end{proof}
+
+\section{Proof of Lemma \ref{th:equivalentloss}}
+
+\begin{lemma} \label{th:equivalentloss}
+    For any $r, a, f, u^{(t)}, u$, \Cref{eq:routerloss} is equivalent to
+    \begin{align*}
+        l\left(r, a, f, u^{(t)}, u\right) &= \sum_{j = 1}^K \left(\Tilde{c}\left(a, f, u^{(t)}, u\right) -\left\|\left( I_N - C_{j} \mathcal{L}_{h}\right)\left(u - u^{(t)}\right)\right\|^2_2\right)\mathds{1}_{r\left(a, f, u^{(t)}, u\right) \neq j} \\
+        &\quad - (K - 1)\Tilde{c}\left(a, f, u^{(t)}, u\right) + \sum_{j = 1}^K  \left\|\left( I_N - C_{j} \mathcal{L}_{h}\right)\left(u - u^{(t)}\right)\right\|^2_2
+    \end{align*}
+\end{lemma}
+
+\begin{proof}
+
+\begin{align*}
+    l\left(r, a, f, u^{(t)}, u\right) &=  \sum_{j = 1}^K \left\|\left( I_N - C_{j} \mathcal{L}_{h}\right)\left(u - u^{(t)}\right)\right\|^2_2\left(1 - \mathds{1}_{r(a, f, u^{(t)}) \neq j} \right) \\
+    &= \sum_{j = 1}^K \left\|\left( I_N - C_{j} \mathcal{L}_{h}\right)\left(u - u^{(t)}\right)\right\|^2_2 - \sum_{j = 1}^K \left\|\left( I_N - C_{j} \mathcal{L}_{h}\right)\left(u - u^{(t)}\right)\right\|^2_2\mathds{1}_{r(a, f, u^{(t)}) \neq j}\\
+    &\quad- \sum_{j = 1}^K\Tilde{c}\left(a, f, u^{(t)}, u\right)\mathds{1}_{r(a, f, u^{(t)}) \neq j} + \sum_{j = 1}^K\Tilde{c}\left(a, f, u^{(t)}, u\right)\mathds{1}_{r(a, f, u^{(t)}) \neq j} \\
+    &=  \sum_{j = 1}^K \left(\Tilde{c}\left(a, f, u^{(t)}, u\right) -\left\|\left( I_N - C_{j} \mathcal{L}_{h}\right)\left(u - u^{(t)}\right)\right\|^2_2\right)\mathds{1}_{r\left(a, f, u^{(t)}, u\right) \neq j} \\
+    &\quad - (K - 1)\Tilde{c}\left(a, f, u^{(t)}, u\right) + \sum_{j = 1}^K  \left\|\left( I_N - C_{j} \mathcal{L}_{h}\right)\left(u - u^{(t)}\right)\right\|^2_2
+\end{align*}
+\end{proof}
+
+\section{Proof of Lemma \ref{th:consistencybound}}
+
+\begin{lemma} \label{th:consistencybound}
+    Let $\left\|\left( I_N - C_{j} \mathcal{L}_{h}\right) e^{(t)}\right\|^2_2 < 1$ for all $j \in [1, K]$. If there exists $j, k \in [1, K]$ such that $\left|\left\|\left( I_N - C_{k} \mathcal{L}_{h}\right)e^{(t)}\right\|^2_2 - \left\|\left( I_N - C_{j} \mathcal{L}_{h}\right)e^{(t)}\right\|^2_2\right| > \Delta > 0$, then for any measurable function $\mathbf{g}$ and for any collection of solvers $\{C_j\}_{j= 1}^K$, the following inequality holds over any distribution of $\mathcal{A} \times \mathcal{U}$:
+    \begin{align*}
+        \mathcal{R}_{l}\left(r\right) - \mathcal{R}_{l}^* \leq \Tilde{\Gamma}\left( \mathcal{R}_{\Psi}\left(r\right) - \mathcal{R}_{\Psi}^*\right)
+    \end{align*}
+    where $\Tilde{\Gamma}(z) = (K - 1)(\Bar{C})\Gamma^{-1}\left(\frac{z}{\Delta}\right)$, $\Gamma(y) = \frac{1 + y}{2}\log(1 + y) + \frac{1 - y}{2}\log(1 - y)$, $\mathcal{R}_{l}^* = \inf_{r} \mathcal{R}_{l}\left(r\right)$, and $\mathcal{R}_{\Psi}^* = \inf_{r} \mathcal{R}_{\Psi}\left(r\right)$
+\end{lemma}
+
+
+\begin{proof}
+    
+\end{proof}
+
+
+\section{Computational Work}
+
+Let $h$ be the finest grid size on which the solution function $u$ must be resolved on. 
+
+\section{Multigrid Algorithms} \label{sec:multigrid}
+
+\sahana{put the pseudocode for 2-grid, V-cycle, and W-cycle}
+
+
+
+\end{document}

@@ -1,0 +1,511 @@
+\documentclass[12pt]{article}
+\usepackage[english]{babel}
+\usepackage[utf8x]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{myst}
+\usepackage{csquotes}
+\usepackage{listings}
+\usepackage{hyperref}
+
+% \DeclareNameAlias{sortname}{family-given}
+
+% \defbibenvironment{bibliography}
+%   {\begin{enumerate}}
+%   {\end{enumerate}}
+%   {\item}
+
+\addbibresource{mybib.bib}
+
+
+
+\Author{Sahana Rayan, Yash Patel, Ambuj Tewari}
+\Date{\today}
+\Title{Literature Review: PDEs and Numerical solutions}
+
+\lstset{style=mystyle}
+
+\begin{document}
+	\MakeScribeTop
+
+\section{Introduction } \label{sec:pde}
+
+A \textit{Partial Differential Equation} (PDE) is an equation which involves an unknown function with more than $2$ variables and contains its partial derivatives. Let the unknown function of $x = (x_1, \cdots, x_n)$ variable be $u: \mathcal{U} \to \mathbb{R}$ where $U$ is an open subset in $\mathbb{R}^n$ and let $D$ denote the partial derivative operator. A PDE of the $k^{\text{th}}$ order is typically expressed as follows:
+$$F\left(D^ku, D^{k - 1}u, \cdots, Du, u, x\right) = 0$$
+where $F: \mathbb{R}^{n^k} \times \mathbb{R}^{n^{k - 1}} \times \cdots \times \mathbb{R}^n \times \mathbb{R} \times U \to \mathbb{R}$
+
+In notation, $u_x = \frac{\partial u}{\partial x}$, $u_{xx} = \frac{\partial^2 u}{\partial x^2}$, and $u_{xy} = \frac{\partial^2 u}{\partial y \partial x}$. For simplicity of notation, $u_{ij} = u_{x_ix_j}$. The laplace operator is denoted as $\Delta$ and $\Delta u = \sum_{i = 1}^n u_{ii}$
+
+In matrix notation, a PDE can be written as $P u = f$ where $P = \frac{\partial }{\partial t } -\nu \frac{\partial^2 }{\partial x^2 } $ and $f = 0$ in the case of the Heat equation or $u_t = \nu u_{xx}$. 
+
+\section{Classification} \label{sec:classification}
+
+A PDE is \textit{linear} if it's linear in it's partial derivatives and the unknowns. For example, 
+$$a_1(x, y)u_{xx} + a_2(x, y)u_{xy} + a_3(x, y)u_{yx} + a_4(x, y)u_{yy} + a_5(x, y)u_{x} + a_6(x, y)u_{y} + a_7(x, y)u = f(x, y)$$
+is a linear PDE. Heat equation, Wave equation, and Laplace equation are also linear PDEs.
+
+
+A PDE is \textit{quasilinear} if the highest order derivatives are the only linear terms, but with coefficients possibly functions of the unknown and lower-order derivatives.
+For example,
+$$a_1(u_x, u_y, u, x, y)u_{xx} + a_2(u_x, u_y, u, x, y)u_{xy} + a_3(u_x, u_y, u, x, y)u_{yx} + a_4(u_x, u_y, u, x, y)u_{yy}  = f(u_x, u_y, u, x, y)$$
+is a quasilinear PDE. Einstein's equations of general relativity and Navier-Stokes equations are quasilinear PDEs.
+
+In the case of second order PDEs, they take on the following form:
+$$Au_{xx} + 2Bu_{xy} + Cu_{yy} + \cdots = 0$$
+
+The discriminant of the PDE is $B^2 - AC$ whic gives way to a new classification:
+\begin{itemize}
+    \item \textit{Elliptical PDEs}: If $B^2 - AC < 0$, then the PDE is elliptical. The matrix $\begin{bmatrix}
+        A & B \\
+        B & C
+    \end{bmatrix}$ has only positive eigenvalues. Laplace's equation ($u_{xx} + u_{yy} = 0$) is an example of a Elliptical PDE
+    \item \textit{Parabolic PDEs}: If $B^2 - AC = 0$, then the PDE is parabolic. The matrix $\begin{bmatrix}
+        A & B \\
+        B & C
+    \end{bmatrix}$ has at least one zero eigenvalue. Heat equation ($ku_{xx} = u_{t}$) is an example of a Parabolic PDE.
+    \item \textit{Hyperbolic PDEs}: If $B^2 - AC > 0$, then the PDE is parabolic. The matrix $\begin{bmatrix}
+        A & B \\
+        B & C
+    \end{bmatrix}$ has at least one negative eigenvalue and one positive eigenvalue. Wave equation ($k^2u_{xx} = u_{tt}$) is an example of a Hyperbolic PDE
+\end{itemize}
+
+
+\section{Analytical Solutions}
+
+While there are many methods of deriving analytical solutions for PDEs, separation of variables is the most popular method. More generally, these solution methods attempt to split the PDE into many ODEs and solve each ODE. Let's solve a initial boundary value problem using separation of variables. 
+
+Let there be a bounded region $D$ in the $(x, y)$ plane such that it is bounded by $\partial D$ and let $h_1, h_2 : D \to \mathbb{R}$. Specifically, let $D$ be $D = \left\{(x, y) \in \mathbb{R}^2: 0 \leq x \leq a, 0 \leq y \leq b\right\}$Find a function $u(x, y, t)$ such that it satisfies the following wave equation:
+$$\frac{\partial^2 u}{\partial t^2} = c^2\left(\frac{\partial^2u}{\partial x^2} + \frac{\partial^2u}{\partial y^2}\right)$$.
+It satisfies Dirichlet boundary conditions or $u(x, y, t) = 0$ for all $(x, y) \in \partial D$ and it satisfies the following initial conditions $u(x, y, 0) = h_1(x, y)$ and $\frac{\partial u}{\partial t}(x, y, 0) = h_2(x, y)$. 
+
+Let's assume that $u(x, y, t) = f(x, y) g(t)$. Then, the wave equation can be rewritten as:
+\begin{align*}
+    f(x, y)g''(t) &= c^2\left(\frac{\partial^2 f}{\partial x^2} + \frac{\partial^2 f}{\partial y^2}\right)g(t) \\
+    \frac{g''(t)}{c^2 g(t)} &= \frac{1}{f(x, y)}\left(\frac{\partial^2 f}{\partial x^2} + \frac{\partial^2 f}{\partial y^2}\right)
+\end{align*}
+Since the LHS doesn't depend on $(x, y)$ and RHS doesn't depend on $t$, then both sides must be equal to a constant $\lambda$
+
+\textbf{Solving Helmholtz equation}
+From the above part, we know that $\frac{\partial^2 f}{\partial x^2} + \frac{\partial^2 f}{\partial y^2} = \lambda f$. We can do a second stage of separation of variables to solve this PDE. Let's assume $f(x, y) = X(x)Y(y)$. The helmholtz equation can be rewritten as:
+\begin{align*}
+    X''(x)Y(y) + X(x)Y''(y) &= \lambda X(x)Y(y) \\
+    \frac{X''(x)}{X(x)} + \frac{Y''(y)}{Y(y)} = \lambda \\
+    \frac{X''(x)}{X(x)} = \lambda - \frac{Y''(y)}{Y(y)} = \mu
+\end{align*}
+where $\mu$ is a constant. This divides this equation into two ODEs
+
+Let's say $\mu > 0$
+We must find $X$ such that $X''(x) = \mu X(x)$ and $X(0) = X(a) = 0$. Let $X(x) = \sum_{n = 0}^{\infty} a_n(x - x_0)^n$ is a power series. Then,
+$X''(x) = \sum_{n= 2}^{\infty}a_{n}n(n- 1)(x - x_0)^{n - 2}$ which can be rewritten as $X''(x) = \sum_{n= 0}^{\infty}a_{n + 2}(n + 2)(n + 1)(x - x_0)^{n}$. So, now the equation is:
+\begin{align*}
+    \sum_{n= 0}^{\infty}a_{n + 2}(n + 2)(n + 1)(x - x_0)^{n} - \mu \sum_{n = 0}^{\infty} a_n(x - x_0)^n = 0
+\end{align*}
+So, $a_{n + 2} = \frac{\mu a_n}{(n + 2)(n + 1)}$. $a_3  = \frac{\mu a_1}{3!}$ and $a_5 = \frac{\mu a_1}{5!}$. Since $X(0) = 0$, $a_0$ must be 0, making $a_{2n} = 0$. So, the solution space is.
+
+\begin{align*}
+    X(x) &= a_1(x - x_0)\sum_{n = 0}^{\infty}\frac{\mu}{(2n + 1)!}(x - x_0)^{2n} \\
+    &= c_1 e^{\sqrt{\mu}(x - x_0)} + c_2 e^{-\sqrt{\mu}(x - x_0)}
+\end{align*}
+since $\sum_{n = 0}^{\infty}\frac{\mu}{(2n + 1)!}(x - x_0)^{2n} = \frac{ e^{\sqrt{\mu}(x - x_0)} - e^{-\sqrt{\mu}(x - x_0)}}{2\sqrt{\mu}(x - x_0)}$
+
+For $X(a) = 0$, $a = 0$. Therefore, $\mu$ is not positive. If $\mu < 0$, $\omega^2 = - \lambda$ so, $X''(x) + \omega^2X(x) = 0$. The solution to this is $X(x) = a\cos(\omega x) + b\sin(\omega x)$. If $X(0) = 0$, then $X(x) = b\sin (\omega x)$. If $X(a) = 0$, $X_n(x) = \sin (\frac{n \pi x}{a})$ where $\omega_n = \frac{n \pi}{a}$. Similarly, $Y_m(y) = \sin (\frac{m \pi y}{b})$. $\mu_n = -\left(\frac{n \pi}{a}\right)^2$ and $\lambda_{mn}= -\left(\frac{n \pi}{a}\right)^2 -\left(\frac{m \pi}{b}\right)^2$. So, then $f_{mn}(x, y) = \sin (\frac{n \pi x}{a})\sin (\frac{m \pi y}{b})$
+
+
+ $g(t)$ is similarly $A\cos(\omega_{mn}t) + B\sin(\omega_{mn}t)$ where $c\sqrt{-\lambda_{mn}}$. So 
+ \begin{align*}
+     u(x, y, t) = \sum_{m, n = 1}^{\infty} \sin \left(\frac{n \pi x}{a}\right)\sin \left(\frac{m \pi y}{b}\right)\left(A_{mn}\cos(\omega_{mn}t) + B_{mn}\sin(\omega_{mn}t)\right)
+ \end{align*}
+
+ where $A_{mn}$ and $B_{mn}$ are determined by $h_1$ and $h_2$
+
+\section{Numerical Solutions - Finite Difference Method}
+
+% \subsection{Finite Differences Method}
+
+
+
+
+
+Let's assume we have the following PDE: 
+$$u_t = \nu u_{xx}$$
+and $x \in [0, 1]$. This can be written as $P u = f$ where $P = \frac{\partial }{\partial t } -\nu \frac{\partial^2 }{\partial x^2 } $ and $f = 0$. Let $u(x, 0) =  f(x)$ (initial condition), $u(0, t) = a(t)$ and $u(1, t) = b(t)$ (boundary condition).
+We can discretize the spatial domain by $\Delta x = \frac{1}{M}$ and $x_k = k \Delta x$. We can similarly discretize the time domain by $\Delta t$ and so, $u^n_k = u(x_k, t_n)$ with $t_n = n\Delta t$.
+By the taylor series expansion, we know that
+\begin{align*}
+    u^n_{k + 1} &= u^n_{k} + u_x(x_k)\Delta x + \frac{u_{xx}(x_i)\Delta x^2}{2!} + \frac{u_{xxx}(x_i)\Delta x^3}{3!} + \cdots \\
+    u^n_{k - 1} &= u^n_{k} - u_x(x_k)\Delta x + \frac{u_{xx}(x_i)\Delta x^2}{2!} - \frac{u_{xxx}(x_i)\Delta x^3}{3!} + \cdots
+\end{align*}
+Using both these expansions:
+\begin{align*}
+     u_x(x_k, t_n) &= \frac{u^n_{k + 1} - u^n_{k}}{\Delta x} - \frac{u_{xx}(x_i)\Delta x}{2!} - \frac{u_{xxx}(x_i)\Delta x^2}{3!} + \cdots \\
+    u_x(x_k, t_n) &= \frac{u^n_{k} - u^n_{k - 1}}{\Delta x} + \frac{u_{xx}(x_i)\Delta x}{2!} - \frac{u_{xxx}(x_i)\Delta x^2}{3!} + \cdots \\
+\end{align*}
+
+We can truncate the rest of the terms to get the following approximation:
+\begin{align*}
+    u_x(x_k, t_n) &\approx \frac{u^n_{k + 1} - u^n_{k}}{\Delta x} = D_x^+ u^n_k\\
+    u_x(x_k, t_n) &\approx \frac{u^n_{k} - u^n_{k - 1}}{\Delta x} = D_x^- u^n_k
+\end{align*}
+where $D_x^+$ is a \textit{forward difference} operator and $D_x^-$ is a \textit{backward difference} operator. The truncated terms form the \textit{truncation or discretization error} which is usually bounded by $O(\Delta x))$. We can also get a \textit{central difference} operator $D_x^1$ by subtracting both the taylor series expansions to get:
+\begin{align*}
+    u_x(x_k, t_n) &\approx \frac{u^n_{k + 1} - u^n_{k - 1}}{2\Delta x} = D_x^1 u^n_k
+\end{align*}
+
+
+\subsection{Elliptical PDEs }
+
+
+(Taken from Chapter 29.1/29.2 of Numerical methods for Engineers)
+
+Let's consider the Laplace equation
+
+\begin{align*}
+    u_{xx} + u_{yy} = 0
+\end{align*}
+
+Let $\Delta x$ determine the discretization of the $\mathcal{X}$ and $x_i = i \Delta x$ and $\Delta y$ determine the discretization of $\mathcal{Y}$ and $y_j = j \Delta y$. If $u_{i, j} = u(x_i, y_j)$, then using a second order central difference operator, we can approximate the second order derivative.
+\begin{align*}
+    u_{xx}(x_i, y_j) &= \frac{u_{i + 1, j} - 2u_{i, j} + u_{i -1, j}}{\Delta x^2 } \quad 
+    &u_{yy}(x_i, y_j) &= \frac{u_{i, j + 1} - 2u_{i, j} + u_{i, j- 1}}{\Delta y^2 }
+\end{align*}
+
+
+If $\Delta x = \Delta y$, we can substitute the above approximations into the Laplace equation to get the following recurrence relation which is also known as the \textit{Laplacian Difference Equation}.
+\begin{align*}
+    u_{i, j + 1} + u_{i, j- 1} + u_{i + 1, j}  + u_{i -1, j} - 4u_{i, j} = 0
+\end{align*}
+With some boundary conditions, we can obtain the values of $u_{i, 0}$ and $u_{0, j}$. For example, if we assume Dirichlet boundary conditions, then
+\begin{align*}
+    u_{1, 2} + u_{1, 0} + u_{2, 1} + u_{0, 1} - 4u_{1, 1} = 0
+\end{align*}
+with $u_{1, 0} = u_{0, 1} = 0$, so, 
+$u_{1, 2} + u_{2, 1} - 4u_{1, 1} = 0$
+
+If $i \in [0, \cdots, N]$ and $j \in [0, \cdots, N]$, then there are $N^2$ unknowns and $N^2$ simultaneous equations taking on the form of the Laplacian Difference Equation. More generally, the system of equations take on the following form - $Ax = b$ where $b$ is a 0 vector in the case of Laplace equation with Dirichlet conditions. But with different boundary conditions or with Poisson equations ($u_{xx} + u_{yy} = f(x, y)$), the vector $b$ can be anything.
+
+Crucially, the matrix $A$ can be observed as an approximiation of the PDE operator with its eigenvectors as approximations of its eigenfunctions. For example, with a 1D Poisson equation, $\mathcal{L} u = f$ where $\mathcal{L} \equiv \frac{\partial^2}{\partial x^2}$. In FD, $A = \frac{1}{\Delta x^2} \begin{bmatrix}
+    -2 &1 &0 & \cdots \\
+    1 & -2 & 1 & \cdots \\
+    0 & 1 & -2 & \cdots \\
+    \vdots & \vdots & \vdots & \ddots 
+\end{bmatrix}$ can be viewed as an approximation of $\mathcal{L}$ and the $j$th eigenfunction of $\mathcal{L}$, $\phi_j(x) = \sqrt{2}\sin(j \pi x)$, is approximated by the $j$th eigenvector of $A$ where the $i^{th}$ component is $\phi_{i, j} = \sqrt{\frac{2}{N + 1}}\sin \left(\frac{ij\pi}{N + 1}\right)$ where there are $N$ grid points. Specifically, $\phi_{i, j}$ can be viewed as an approximation of $\phi_j(x_i) = \phi_j(\frac{i}{N})$. Similarly, the eigenvalue of $\mathcal{L}$ is approximated by the eigenvalue of $A$.
+
+This system of equations requires computing the inverse of a coefficient matrix $A$ which is challenging to compute in closed form. However, there are numerical approximation methods that can be used which are usually of two types - \textit{Elimination} and \textit{Iterative} methods. 
+
+\subsubsection{Elimination Methods}
+
+\textit{Gaussian Elimination} method which uses reduced row echelon form to conmpute inverses is a popular method for solving a system of linear equations but this often fails with a large number of equations and falls victim to round off errors. Naive version of Gauss Elimination includes forward elimination step (converting the matrix into its reduced row echelon form or an upper triangular matrix) and then a back substitution step (solving the simpler system of equations). \textit{LU} decomposition can come in handy to make the tedious forward elimination step in Gaussian Elimination method to be applicable for all vectors $b$. A changing $b$ can occur if the boundary conditions change or the $f(x, y)$ in the Poisson equation change. $LUx = b$ \textit{Thomas Algorithm}, which is used for tridiagonal matrices (matrices with $0$ in every entry except the band of size $3$ on the diagnonal), consists of three steps - decomposition, forward eliminations and back subsitution. If $A$ is symmetric matrix and positive definite, the general LU decomposition can be made simpler with the Cholesky Decomposition.
+
+
+\subsubsection{Iterative Methods}
+
+Iterative methods often have advantages over Elimination methods in high spatial dimensions (See \Cref{tab:compcost}). More generally, iterative methods involve splitting $A$ matrix and using that split to iteratively update $x$ using $x^{(j + 1)} = H x^{(j)}$. 
+
+\textit{Gauss-Seidel} method is one of the most popular iterative methods to find the inverse of a matrix. In this method, we initialize the values of $x$ with some guesses and use the initial values to solve for $x_1$ in the first equation. We can then use the new value of $x_1$ to solve for $x_2$ in the second equation. This continues until the algorithm converges or $\epsilon_i = \left|\frac{x_i^j - x_i^{j - 1}}{x_i^{j - 1}}\right| < \epsilon$ for all $i$. Formally, $A$ is split into $A = D - L - U$ where $D$ is the Diagnonal parts of $A$, $U$ is the additive inverse of the upper triangle parts of $A$, and $L$ is the additive inverse of the lower triangle parts of $A$ (See \href{https://ocw.mit.edu/courses/16-920j-numerical-methods-for-partial-differential-equations-sma-5212-spring-2003/resources/lec6_notes/}{here} and \href{https://math.mit.edu/classes/18.086/2006/am62.pdf}{here} for references). Then, $(D - L - U)x = b$ or $(D - L)x = Ux + b$  which lends itself to following update rule - $x^{(j + 1)} = (D - L)^{-1}\left(Ux^{(j)} + b\right)$. The residual vector refers to $r^{(j)} = b - Ax^{(j)}$ and the iteration error is $e^{(j)} = x - x^{(j)}$ which is related by $Ae^{(j)} = r^{(j)}$. While we don't have access to iterative errors, we can compute residuals. When subtracting the update rule from the equations that inspires it or $(D - L)x = Ux + b$, we get an error equation $e^{(j + 1)} = (D - L)^{-1}Ue^{(j)} = M_{GS}e^{(j)}$ which describes how the errors might dampen or increase from iteration to iteration. $M_{GS}$ is also called the iterative matrix of the Jacobi method. 
+% Intuitively, if $e^{(1)}$ is seen as a linear combination of the eigenvectors of $M_{GS}$, then continuously multiplying $M_{GS}$ to it is equivalent to multiplying $e^{(1)}$ with a power of an eigenvalue of $M_{GS}$. 
+
+If $M_{GS}$ is diagonalizable, then the eigendecomposition of the $M_{GS}$ is $M_{GS} = PDP^{-1}$ where $P$ is a square matrix whose $i^{th}$ column is the eigenvector of $M_{GS}$ and $D$ is a diagonal matrix containing corresponding eigenvalues. We know that the error equation is $e^{(j + 1)} = M_{GS}^je^{(1)} = PD^jP^{-1}e^{(1)}$. $P^{-1}e^{(1)}$ can be seen as the coordinates of $e^{(1)}$ in the eigenbasis of $M_{GS}$ or $c_1, \cdots, c_N$. Then, $$e^{(j + 1)}  = P\begin{bmatrix}
+    \lambda_1^jc_1 \\
+    \vdots \\
+    \lambda_N^jc_N
+\end{bmatrix}$$
+
+Then, we have each term $\lambda_i^jc_i \to 0$ as $j \to \infty$ as long as $|\lambda_i| < 1$ for every $i$. This inspires the following convergence condition -  $\rho(M_{GS}) = \max |\lambda(M_{GS})| < 1$. That is, the spectral radius of $M_{GS}$ or the maximum absolute value of the eigenvalue must be less than $1$ for the errors to dampen. Convergence is guaranteed if the matrix $A$ is strictly diagonally dominant ($a_{ii} > \sum_{j\neq i} a_{ij}$) or symmetric and positive definite.  This method is called \textit{Liebmann} method when applied to PDEs. 
+
+\textit{Jacobi} method is another iterative method which applies to strictly diagonally system of linear equations. Since it only uses values from the previous iteration (Gauss-Seidel uses recently computed values), it is often easier to parallelize, but it converges slower than Gauss Seidel. Formally, $A$ is split into $D - L - U$ which makes $Ax = (D - L - U)x = b$. This can be rearranged into $Dx = (L + U)x + b$ which inspires the update rule $x^{(j + 1)} = D^{-1}\left((L + U)x^{(j)} + b\right)$. The error equation now becomes 
+$e^{(j + 1)} = D^{-1}(L + U)e^{(j)} = M_{Jac}e^{(j)}$. The same convergence condition as the Gauss-Seidel Method follows. 
+
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{|c|c|c|}
+    \hline
+        Dimensions & Gauss Elimination & Iterative \\
+        \hline
+         1& $O(N)$ & $O(N^3)$  \\
+         2& $O(N^4)$ & $O(N^4)$  \\
+         3& $O(N^7)$ & $O(N^5)$  \\
+         \hline
+    \end{tabular}
+    \caption{Computational costs of these numerical linear algebra methods}
+    \label{tab:compcost}
+\end{table}
+
+
+\subsubsection{Relaxation}
+
+We can include a \textit{relaxation} step between iterations of Gauss Seidel to improve convergence. When each new value of $x_i$ is computed, it is actually modified as a weighted average of the newly computed value $x_i^{\text{new}}$ and the value from the previous iteration $x_i^{\text{prev}}$. Namely,
+\begin{align*}
+    x_i = \omega x_i^{\text{new}} + (1 - \omega)x_i^{\text{prev}}
+\end{align*}
+where $\omega \in [0, 2]$. When $\omega = 1$, we go back to the vanilla Gauss-Seidel algorithm. When $\omega \in [0, 1)$, it's a convex combination of $x_i^{\text{new}}$ and $x_i^{\text{prev}}$ which is called \textit{underrelaxation}. This makes nonconvergent system of equations converge or hastens convergence by dampening out oscillations. When $\omega \in (1, 2]$, there is an extra weight on the new value and this is called \textit{overrelaxation}. Here, there is an implicit assumption that the new values are generally moving in the right direction and overrelaxation simply makes convergence faster for already convergent system of equations. This is also called \textit{Successive Over Relaxation}
+
+
+
+\subsubsection{Multigrid Method}
+(\href{https://ocw.mit.edu/courses/16-920j-numerical-methods-for-partial-differential-equations-sma-5212-spring-2003/resources/lec7_notes/}{Source 1}, \href{https://math.mit.edu/classes/18.086/2006/am62.pdf}{Source 2}, \href{https://math.mit.edu/classes/18.086/2006/am63.pdf}{Source 3})
+
+Multigrid methods use iterative approaches to finite differenced to remove the high frequency components of the error, leaving the smooth parts or low frequency components for a coarser grid to drive the iterative error to $0$ faster.
+
+In iterative methods, the spectral radius of the iterative matrix $M$ decides whether an iterative algorithm can converge or not. But the parts of the error may converge faster than others and such rates are determined by the eigenvalues of the associated component or eigenvector. For example, let $$e^{(j + 1)}  = P\begin{bmatrix}
+    \lambda_1^jc_1 \\
+    \vdots \\
+    \lambda_N^jc_N
+\end{bmatrix}$$
+be the error equation which comes from the eigendecomposition of the iterative matrix $M$. If $|\lambda_i| < |\lambda_k|$, then the coefficient of $e^{(j + 1)}$ associated with the $i^{th}$ eigenvector in the eigenbasis of $M$ will be driven to $0$ faster than that of the $k^{th}$ eigenvector.
+
+The iteration matrix of $M$ shares the same eigenvectors as $A$ in the case of jacobi method and the high frequency components of the error refer to the eigenvectors associated to the high frequency eigenfunctions of the PDE operator $\mathcal{L}$ that we want to approximate. So, as $j$ increases, the frequency of the associated eigenfunctions and therefore, eigenvector of $M$ increases in the case of the 1D Poisson equation. 
+
+In multigrid methods, we assume that the high frequency components  will be squashed in a few iterations as it's associated eigenvalues have a low magnitude. This assumption doesn't hold with Jacobi methods. In the Jacobi methid, the $\lambda_j(M_{Jac}) = \cos(\frac{j\pi}{N + 1})$. Then, $|\lambda_1(M)| = |\lambda_N(M)| = 1$ when the $1^{st}$ eigenvector represents a lowest frequency eigenfunction and the $N^{th}$ eigenvector represents highest frequency eigenfunction. This doesn't give much promise for Jacobi to drive the high frequency error components to $0$ faster than the low frequency parts. But, using an underrelaxed Jacobi gives rise to $M_{Jac} = I - \omega D^{-1}A$ whose eigenvalues are $1 - \omega + \omega\cos(\frac{j\pi}{N + 1})$. If $\omega = \frac{2}{3}$, then $|\lambda_{N/2}(M)| = |\lambda_N(M)| = \frac{1}{3}$ making the half of the eigenvectors representing high frequency modes can be driven to $0$ by weighted Jacobi method in a few iteration, leaving the smooth parts of the error. A similar analysis is difficult to do for Gauss-Seidel methods since the eigenvectors of $A$ aren't the same as it's iterative matrix $M_{GS}$. 
+
+Let $A = A_h$ be the original matrix on a fine grid and $A_{2h}$ is the coeffecient matrix on the coarse grid which is approximated by $RA_hI$ where 
+
+\begin{itemize}
+    \item $R$ or \textit{restriction matrix} is a rectangle matrix that transfers vectors from the fine grid to the coarse grid
+    \item $I$ or the \textit{interpolation matrix} is a rectangle matrix that transfers vectors from the coarse grid to the fine grid
+\end{itemize}
+
+For example, let $h = \frac{1}{8}$ where $x \in [0, 1]$ with zero boundary conditions. There are $7$ grid point values or $u_1, \dots, u_7$ to solve for . But on a coarser grid $2h$, there are $3$ grid point values or $v_1, v_2, v_3$. Notice how $v_1 = u_2, v_2 = u_4, v_3 = u_6$. For the odd-valued grid points, we can approximate it using linear interpolation and so if $Iv = u$, $I = \frac{1}{2} \begin{bmatrix}
+    1 & 0 & 0 \\
+    2 & 0 & 0 \\
+    1 & 1 & 0 \\
+    0 & 2 & 0 \\
+    0 & 1 & 1\\
+    0 & 0 & 2 \\
+    0 & 0 & 1
+\end{bmatrix}$
+
+The restriction matrix could just be a 0-1 injection matrix that only uses the even-valued entries but this ignores off-valued entries. You can also use a full weighting restriction matrix:
+\begin{align*}
+    R = \frac{1}{2}I^{\top} = \frac{1}{4} \begin{bmatrix}
+        1 & 2 & 1 & 0 & 0 & 0 & 0 \\
+        0 & 0 & 1 & 2 & 1 & 0 & 0 \\
+        0 & 0 & 0 & 0 & 1 & 2 & 1 
+    \end{bmatrix}
+\end{align*}
+
+In case of two dimensions, going from a coarser grid to a finer grid involves bilinear interpolations where $u_{2i, 2j} = v_{i, j}$, $u_{2i, 2j + 1} = \frac{1}{2}(v_{i, j} + v_{i, j + 1})$, $u_{2i + 1, 2j} = \frac{1}{2}(v_{i, j} + v_{i + 1, j})$, $u_{2i + 1, 2j + 1} = \frac{1}{4}(v_{i, j} + v_{i, j + 1} + v_{i + 1, j} + v_{i + 1, j + 1})$. The interpolation matrix would be filled with $1, \frac{1}{2}, \frac{1}{4}, 0$. The full weighting restriction matrix would be $\frac{1}{4}I^{\top}$
+
+The most simple multigrid method is the two-grid V-cycle. It involves two grids with iterations for each grid using a Jacobi (with $\omega = \frac{2}{3}$) solver or Gauss-Seidel. we assume that the low frequency smooth parts converge slowly on a fine grid ans so the multigrid methods transfers the current residual $r_h = b - Ax_h$ to coarse grid of with $2h$ by $r_{2h} - R_h^{2h}r_h$. A few iterations are run on the coarse grid to estimate the error $E_{2h}$ by solving $A_{2h}E_{2h} = r_{2h}$. The error is interpolated back to the fine grid $E_h = I^h_{2h}E_{2h}$. A correction is made - $x_h + E_h$ and the cycle continues.
+
+The questions remains if the true error $e_h = x - x_h$ can really be estimated by $E_h$. We know that $A_{2h} = RA_{h}I$, $r = Ae$ and so the above steps gives us the following relation between $E_h$ and $e_h$:
+$$E_h = I(RA_hI)^{-1}RAe = Se$$. $S$ can't be the identity matrix but it is idempotent matrix ($S^2 = S$). So , the new error is now $e - E = (I - S)e$ and now $I - S$ is the v-cycle matrix when $I - D^{-1}A$ is the iteration matrix. The eigenvalues of an idempotent matrix are either $0$ or $1$ and so an error of the form of an eigenvector with $\lambda = 0$, $E = Se = 0*e = 0$ and multigrid methods add $0$ improvement. But, if the error is of the form of an eigenvector with $\lambda = 1$, then  $E = Se = 1*e = e$ and multigrid works perfectly. So if we have a perfect smoother that removes high frequency components (maybe the eigenvectors with $\lambda = 0$) and a perfect multigrid method that handles low frequency parts, we may still have some error - $e^{(j + 1)} \leq \rho e^{(j)}$ where $\rho = 0.1$. When compared to $\rho = 0.999$ for Jacobi, this does produce significant speedups. But, if the user desires higher accuracy, i.e. $e = O(h^2) = O(N^{-2})$, then $\rho^k = O(N^{-2})$ and $k = O(\log N)$ cycles. Instead of using V-cycles, nesting V-cycles, or using W-cycles, a full multigrid is often employed to further reduce the number of cycles. 
+
+The two grid V-cycle can be be generalized to multiple grids when the V-cycle steps are nested. W-cycles are generally more superior to V-cycles or nested V-cycles as W-cycles stay coarse for longer. But, Full multigrid is asymptotically better than V-cycles and W-cycles.
+
+Full Multigrid starts on the coarsest grid ($8h$), the solution is interpolated for grid $4h$,  a v-cycle between $4h$ and $8h$ occurs, the solution is interpolated for grid $2h$, and then a deeper v-cycle between $2h, 4h, 8h$ occurs. This continues till we get to the finest grid.
+
+The eigenvectors of $I - S$, unlike the iteration matrices, are a mix of high and low frequencies. $A$ keeps the frequencies separate. By mixing the frequencies, we allow low frequency modes to be high freqencies on a coarser grid. Since the interpolation may introduce some more high frequency errors, we need to cycle through these patterns to effectivelt squash both high and low frequency errors. 
+
+\subsection{Parabolic PDEs}
+
+\subsubsection{Explicit Method}
+
+$u_{xx}$ can be estimated using the \textit{explicit} scheme which involves a first order forward difference operator for the time derivative and a second order central difference operator.
+
+Let $u_{xx}(x_k, t_n) = \frac{u_{x}\left(x_{k + \frac{1}{2}}, t\right) - u_{x}\left(x_{k - \frac{1}{2}}, t\right)}{\Delta x}$ and $u_{x}\left(x_{k + \frac{1}{2}}, t_n\right) = \frac{u^n_{k + 1} - u^n_{k}}{\Delta x}$. Then,
+
+\begin{align*}
+    u_{xx}(x_k, t_n) = \frac{u_{k + 1}^n - 2u_k^n + u^n_{k - 1}}{\Delta x^2}
+\end{align*}
+
+while the time derivative is expressed as : $$u_t(x_k, t_n) = \frac{u^{n + 1}_{k} - u^n_{k}}{\Delta t}$$. The PDE can be rewritten as:
+
+\begin{align*}
+    \frac{u^{n + 1}_{k} - u^n_{k}}{\nu \Delta t} &=  \frac{u_{k + 1}^n - 2u_k^n + u^n_{k - 1}}{\Delta x^2} \\
+    u^{n + 1}_{k} &= u^n_{k} + \nu \frac{\Delta t}{\Delta x^2}\left(u_{k + 1}^n - 2u_k^n + u^n_{k - 1}\right)
+\end{align*}
+
+Solving this recurrence relation can help reconstruct $u$. We know that:
+\begin{align*}
+    u_k^0 &= f(k\Delta x) \\
+    u_0^{n + 1} &= a((n + 1) \Delta t) \\
+    u_M^{n + 1} &= b((n + 1) \Delta t)
+\end{align*}
+We can use $u_k^0$ to get $u_k^1$ for $k = 1, \ldots$ with $u_0^1 = a(1\Delta t)$ and $u_M^1 = b(1\Delta t)$ and then we can move to the next time step. This method is called \textit{explicit} because
+
+
+The difference scheme is \textit{consistent} with the PDE if the truncation error approaches $0$ or $P u - \widehat{P}_{\Delta x, \Delta t} u \to 0$ as $\Delta x, \Delta t $ approach $0$. The difference scheme is \textit{convergent} if $u_k^n$ converges with $u(x, t)$ as $(k \Delta x, n \Delta t)$ converges to $(x, t)$. The finite difference scheme is considered \textit{stable} if the errors don't amplify but are attentuated. In the case of this explicit method, if $\lambda =  \nu \frac{\Delta t}{\Delta x^2} \leq \frac{1}{2}$, the scheme achieves stability. If $\lambda \in \left(\frac{1}{4}, \frac{1}{2}\right]$, the errors could oscillate but still reduce. When $\lambda \leq \frac{1}{6}$, the truncation errors are minimized. 
+
+\subsubsection{Implicit Method}
+
+$u_{xx}$ can be estimated using the \textit{implicit} scheme which involves a first order backward difference operator for the time derivative and a second order central difference operator. So, 
+
+\begin{align*}
+    u_{xx}(x_k, t_n) = \frac{u_{k + 1}^n - 2u_k^n + u^n_{k - 1}}{\Delta x^2}
+\end{align*}
+
+while the time derivative is expressed as : $$u_t(x_k, t_n) = \frac{u^{n}_{k} - u^{n - 1}_{k}}{\Delta t}$$. The PDE can be rewritten as:
+
+\begin{align*}
+    \frac{u^{n}_{k} - u^{n - 1}_{k}}{\nu \Delta t} &=  \frac{u_{k + 1}^n - 2u_k^n + u^n_{k - 1}}{\Delta x^2} \\
+    u^{n}_{k} &= u^{n - 1}_{k} + \nu \frac{\Delta t}{\Delta x^2}\left(u_{k + 1}^n - 2u_k^n + u^n_{k - 1}\right)
+\end{align*}
+
+This doesn't lend itself to a nice recurrence relationship like Explicit methods. So, we can arrange this into a system of linear equations and use the Thomas method for tridiagonal methods to solve it for each time step $t$. But they can be 
+
+These implicit methods are numerically intensive but they are unconditionally stable. \textit{Crank-Nicholson} Method is another type of implicit method but I don't think I need to describe it here. 
+
+
+
+\section{Numerical Solutions - Finite Element Method}
+
+
+In FD methods, the solution domain is divided into a grid. The PDE is then written for each grid point and its derivatives replaced by finite-divided differences. FD methods, however, has a number of shortcomings. In particular, it becomes harder to apply for
+systems with irregular geometry, unusual boundary conditions, or heterogenous composition. Due to the bottleneck caused by the grid discretization, the finite-element method divides the solution domain into simply shaped regions, or ``elements'' and the PDE is approximated for each element.
+
+The general approach starts off with identifying an appropriate discretization. The lines that make up the sides of the elements are called nodal lines or planes and the points of intersection are called nodes. The next step involves approximating the solution for each element. In the one-dimensional case, we can assume that the approximation function can be a first order polynomial or $u(x) = a_0 + a_1 x$. If we have the values of $u$ for the end points  $x_1, x_2$ of the element $u(x_1) = u_1, u(x_1) = u_1$, $u_1 = a_0 + a_1 x$ and $u_2 = a_0 + a_1 x_2$. Then, $a_0 = \frac{u_1x_2 - u_2x_1}{x_2 - x_1}$ and $a_1 = \frac{u_2- u_1}{x_2 - x_1}$. Subsitituting this back in the equation gives rise to: $$u = N_1 u_1 + N_2 u_2$$ where $N_1 = \frac{x_2 - x}{x_2 - x_1}$ and $N_2 = \frac{x - x_1}{x_2 - x_1}$
+
+This equation is called the \textit{approximation/shape function} while $N_1, N_2$ are called the \textit{interpolation functions}. The sum of these functions sum to $1$. This looks like a first-order Lagrangian interpolating polynomial where $N_1, N_2$ are the lagrangian basis for the polynomial. 
+
+\textit{Lagrangian Polynomials} are polynomials that interpolate a given set of points $\{(x_i, y_i)\}_{i = 0}^k$. The Lagrangian polynomial $\mathcal{L}(x)$ has a degree of at most $k$ such that $\mathcal{L}(x_i) = y_i$ for every $i$. The lagrangian polynomial is often
+\begin{align*}
+    \mathcal{L}(x) = \sum_{i = 0}^k y_i l_i(x)
+\end{align*}
+where $\{l_i(x)\}_{i = 0}^k$ form the lagrangian basis of the interpolating polynomial. $l_i(x) = \prod_{0 \leq m \leq k, m \neq i} \frac{x - x_m}{x_i - x_m}$
+
+We can take the derivative of this appproximation function.
+\begin{align*}
+    \frac{d u}{d x} = \frac{dN_1}{dx} u_1 + \frac{dN_2}{dx}u_2
+\end{align*}
+
+where $\frac{dN_1}{dx} = \frac{-1}{x_2 - x_1}$ and $\frac{dN_2}{dx} = \frac{1}{x_2 - x_1}$ giving rise to $\frac{d u}{d x} = \frac{u_2 - u_1}{x_2 - x_1}$
+
+The integral can be represented as follows:
+\begin{align*}
+    \int_{x_1}^{x_2} u dx &= \int_{x_1}^{x_2} N_1 u_1 + N_2 u_2 dx \\
+    &= \frac{u_1 + u_2}{2}(x_2 - x_1)
+\end{align*}
+which is the formula for the trapezoidal rule. Once the interpolation functions are fit for every element, the coefficients or $u_1, u_2$ need to computed with the underlying PDE in mind. Methods that perform this kind of curve fitting includes the direct approach, method of weighted residuals, and the variational approach where the functions are not fit to the data but through the PDEs that govern the system. This presents a system of linear equations $[k]\{u\} = \{F\}$ where $[k]$ is the element property or stiffness matrix, $\{u\}$ is the column vector of unknowns at the nodes and $\{F\}$ is a column vector of external forces that affect the nodes. 
+
+These equations must be unified through a process of assembly which ensures continuity such that the solutions of the contiguous elements are matched such that unknowns at the nodes are the same. With the equations assembled and the boundary conditions incorporated, the system takes on the following form:
+$$[k]\{u'\} = \{F'\}$$ where $[K]$ is the assemblage property matrix, $\{u'\}$ is the column vector of unknowns at the nodes of all elements and $\{F\}$ is a column vector of external forces that affect the nodes across all elements. Solving this might involve elimination or iterative methods. 
+
+% \subsection{Iterative methods}
+
+
+
+
+
+\section{Numerical Solutions - Spectral Operators }
+
+
+
+\section{Numerical Solutions - Neural Operators}
+
+Neural operators are mappings between infinite dimensional function spaces but neural operators can be learned to solve a PDEs. They are especially desirable because they are discretization-invariant - acts on any discretization of the input function and the output function can be evaluated at any point. 
+
+Formally, Let $\mathcal{A} = \{a: D \to \mathbb{R}^d\}$ be the infinite dimensional Banach space of input functions and $\mathcal{U} = \{a: D \to \mathbb{R}^m\}$ be the infinite dimensional Banach space of output functions where $D \in \mathbb{R}^n$ is the spatial domain. Let's consider a PDE of the following form:
+$$L_{a}u(x) = f(x)$$
+
+where $a \in \mathcal{A} $ is some coefficient function,  $u \in \mathcal{U}$ is the solution to the PDE, $L_a$ is a differential operator parameterized by $a$ and $f$ is a forcing function which can be fixed or parameterized by $a$. $a$ can be a boundary condition or a material property. Suppose we have some observations $\{(a_i, u_i)\}_{i = 1}^N$ such that $a_i \sim \mu$ are iid samples drawn from some distributions and $u_i$ is generated using a map between $\mathcal{A}$ and $\mathcal{U}$ - $u_i = \mathcal{G}^{*}(a_i)$. Neural operators  $\mathcal{G}_{\theta}$ aim to approximate $\mathcal{G}^*$ by minimized the following loss:
+\begin{align*}
+    \mathbb{E}_{a \sim \mathcal{P}}\left[\left\|\mathcal{G}^*(a) - \mathcal{G}_{\theta}(a)\right\|^2_{\mathcal{U}}\right] &= \int_{\mathcal{A}} \left\|\mathcal{G}^*(a) - \mathcal{G}_{\theta}(a)\right\|^2_{\mathcal{U}} d\mu(a) \\
+    &= \int_{\mathcal{A}} \left\|\mathcal{G}^*(a) - \mathcal{G}_{\theta}(a)\right\|^2_{\mathcal{U}} d\mu(a)
+\end{align*}
+where $\|f\|^2_{\mathcal{U}} = \int_{D} |f(x)|^2dx$
+
+Under some general conditions for $L_a$, we can define a Green's function $G: D \times D \to \mathbb{R}$ where $L_a G(x, .) = \delta_x $. If $u(x) = \int_D G(x, y) f(y)dy$, then
+
+\begin{align*}
+    (L_au)(x) &= \int_D (L_aG)(x, y) f(y)dy \\
+    &= \int_D \delta_x f(y)dy \\ 
+    &= f(x)
+\end{align*}
+
+This principle inspires the architecture of a neural operator which has the following overall structure:
+\begin{enumerate}
+    \item \textbf{Lifting}: Use a pointwise operation $\mathcal{P}: \mathbb{R}^d \to \mathbb{R}^{d_0}$ which takes in $a \in \mathcal{A}$ and maps it to $v_0 \in \{v : D \to \mathbb{R}^{d_0}\}$. For example, $(\mathcal{P}(a))(x) = \mathcal{P}(a(x))$
+    \item \textbf{Kernel Integration}: for $t = 0, \dots, T$, operators maps function $v_t: D_t \to \mathbb{R}^{d_t}$ to function $v_{t + 1}: D_{t + 1} \to \mathbb{R}^{d_{t + 1}}$ where $D_0 = D_T = D$. This mapping takes the following form:
+    $$v_{t + 1}(x) = \sigma_t\left(W_tv_t(\Pi_t(x)) + (\mathcal{K}_tv_t)(x) + b_t(x)\right)$$ for every $x \in D_{t + 1}$ where $W_t \in \mathbb{R}^{d_{t + 1} \times d_{t}}$ are local linear operators or matrices (discretization invariant), $\Pi_t : D_{t + 1} \to D_{t}$ are fixed mappings, $\mathcal{K}_t: \{v_t: D_t \to \mathbb{R}^{d_{t + 1}}\} \to \{v_{t + 1}: D_{t + 1} \to \mathbb{R}^{d_{t + 1}}\}$ are non-local integral kernel operators, $b_t: D_{t + 1} \to \mathbb{R}^{d_{t + 1}}$ are bias functions, and $\sigma_t$ are fixed activation functions that act pointwise mapping from $\mathbb{R}^{d_{t + 1}}$ to $\mathbb{R}^{d_{t + 1}}$. The kernel transform can be $(\mathcal{K}_tv_t)(x) = \int_{D_t}\kappa(x, y)v_t(y)d\nu_t(y)$. The bias is often a constant function and so it can be parameterized by a vector in $\mathbb{R}^{d_{t + 1}}$
+    \item \textbf{Projection} Use a pointwise operation $\mathcal{Q}: \mathbb{R}^{d_T} \to \mathbb{R}^{m}$ which takes in $v_T \in \{v : D_T \to \mathbb{R}^{d_T}\}$ and maps it to $u \in \mathcal{U}$. $(\mathcal{Q}(a))(x) = \mathcal{Q}(a(x))$ is a fully local operator. 
+\end{enumerate}
+
+
+
+In the kernel integration step, if we assume that $ D_t \equiv D_{t + 1} \equiv D$ and $\{x_1, \dots x_J\} \subset D$ are uniform samples from $D$, $(\mathcal{K}_tv_t)(x_j)$ is approximated by
+$$\frac{1}{J}\sum_{l = 1}^J \kappa(x_j, x_l)v(x_l)$$. With this discretization, $K_t \in \mathbb{R}^{d_{t + 1}J \times d_{t}J}$ which is a $J \times J$ block matrix such that $K_{jl} = \kappa(x_j, x_l) \in \mathbb{R}^{d_{t + 1} \times d_t}$. This kernel intergration approximation step is $O(J^2d_{t + 1}d_t)$ which becomes quite intractable as $J$ becomes large. Various types of neural operators come from the different methods used to can approximate $\mathcal{K}_t$ derived based on structural assumptions made about the matrix. Since the computations involving $W_t, b, \sigma$ are $O(J)$, the focus of these types of neural operators has been to speed up the approximation of the kernel integration step. 
+
+
+\subsection{Graph Neural Operators}
+
+Graph Neural Operators combines Nystrom's approximations and domain truncation and uses the Graph Neural Network architecture.
+
+In the kernel integration step where $(\mathcal{K}_tv_t)(x) = \int_{D_t}\kappa(x, y)v_t(y)d\nu_t(y)$, graph neural operators choose a Borel measure $\nu_t$ to be  Lebesgue measure supported on a ball of radius $r$ centered at $x$ or $\nu_t(dy) = 1_{B(x, r)}dy$. This choice for a measure is motivated by the ease in computation and the decay property of the Green's function.
+
+Message passing graph neural networks can now be used to approximate this integral. If $D$ is discretized into $J$ uniform points where each point is considered a node with node features $v_t(x)$. A node $x$ isconnected by another node if they lie in $B(x, r)$ and this defines the neighborhood set of $N(x)$. The edge features can be $e(x, y) = (x, y, a(x), a(y))$. Then, a monte carlo approximation of the kernel integral transform can be written as:
+$$v_{t + 1}(x) = \sigma_t\left(W_tv_t(\Pi_t(x)) + \frac{1}{|N(x)|}\sum_{y \in N(x)} \kappa_{\phi}(e(x, y))v_t(y) + b_t(x)\right)$$
+where $\kappa_{\phi}: D \times D \times \mathbb{R}^d \times \mathbb{R}^d  \to \mathbb{R}^{d_{t + 1} \times d_{t}}$ is a neural network.
+
+Nystrom's approximations boils down to sampling $J'$ points $\{x_{k_1}, \dots, x_{k_{J'}}\}$ from $\{x_1, \cdots, x_{J}\}$ such that $J' << J$ and now the kernel integral transform operation can be approximated by:
+$$(\mathcal{K}_t v_t)(x_{k_j}) \approx \frac{1}{J'}\sum_{l = 1}^{J'} \kappa_{\phi}(x_{k_j}, x_{k_l})v(x_{k_l})1_{x_{k_l} \in B(x_{k_j}, r)}$$. Let $K_{J'J'}$ be a $J' \times J'$ block matrix and let $K_{JJ}$ be the original kernel matrix. Then $K_{JJ} = K_{JJ'}K_{J'J'}K_{J'J}$. $l$ such subgraphs with $J'$ nodes can be sampled from the graph with $J$ nodes and a similar kernel integration approximation step is performed where a new kernel $\kappa_{\phi}$ is learnt for each subgraph. Doing this reduces the time complexity of this step to $O(lJ'^2)$ . This is far better than the initial $O(J^2)$. 
+
+% Another trick that is employed in Graph Neural Operators involve truncating the integral to a subdomain of $D$ using a functions $s: D \to \mathcal{B}(D)$. So, now, the kernel integral transform can be represented as:
+% \begin{align*}
+%     \int_{s(x)}\kappa(x, y)v_t(y)dy
+% \end{align*}
+
+% We can consider $s(x) = \{y: \|x - y\| < r\}$ a ball around $x$ with radius $r$ 
+
+This is discretization -invariant. Although the number of points $J$ on the graph depends on how many times the input function was evaluated and $N(x)$ grows with discretization size, none of the dimensions of actual parameters of the neural network explicitly depend on the discretization size. But, the output function can only be evaluated on points that are on the graph. The output function may be evaluated on the rest of the points through interpolation. 
+
+\subsection{Low Rank Neural Operators}
+
+If we assume that $\kappa$ is a tensor product and $d_{t} = d_{t = 1} = 1$, then we can write $\kappa$ as 
+$$\kappa(x, y) = \sum_{j = 1}^r \phi_j(x)\psi_j(y)$$
+
+Then, the kernel integral transform would take on the following form:
+\begin{align*}
+    (\mathcal{K}_tv_t)(x) &= \int_{D_t}\sum_{j = 1}^r \phi_j(x)\psi_j(y)v_t(y)dy \\
+    &= \sum_{j = 1}^r \left(\int_{D_t} \psi_j(y)v_t(y)dy\right) \phi_j(x) \\
+    &= \sum_{j = 1}^r \left< \psi_j,v_t\right>_{L^2(D\dot, \mathbb{R})} \phi_j(x)
+\end{align*}
+
+where $\left<f, g\right>_{L^2(D\dot, \mathbb{R})} = \int_{D} f(x)g(x)dx$. Since the dot product is independent of the value of $x$, it can be evaluate once making the time complexity $O(rJ)$. Lifting this from the unidimensional setting would make $\phi_j: D \to \mathbb{R}^{d_{t + 1}}$ and $\psi_j: D \to \mathbb{R}^{d_{t}}$. Then,
+
+$$(\mathcal{K}_tv_t)(x) = \sum_{j = 1}^r \left< \psi_j,v_t\right>_{L^2(D\dot, \mathbb{R}^{d_t})} \phi_j(x)$$.
+
+By making this tensor product assumption, we are assuming rank $r$ structure in the kernel martix or $K = K_{Jr}K_{rJ}$
+
+
+\subsection{Fourier Neural Operators}
+
+Fourier Neural Operators (FNO) parameterize the kernel $\kappa$ on the Fourier space instead of the domain $D$. FNOs use the convolutional theorem to do so. 
+
+In the context of the kernel integrals, the convolution theorem states that if $u(x): D \to \mathbb{R}^{m \times n}$ and $v(x): D\to \mathbb{R}^n$ are functions with fourier transforms:
+
+\begin{align*}
+    (\mathcal{F} u)_{lo} (j) &= \int_{\mathbb{R}^d}u_{lo}(x) e^{-2i\pi <x, j>} dx \\
+     (\mathcal{F} v)_l (j) &=  \int_{\mathbb{R}^d} v_l(x) e^{-2i\pi <x, j>} dx
+\end{align*}
+. Let the Inverse Fourier be $$(\mathcal{F}^{-1} w)_l (x) = \sum_{j \in \mathbb{Z}^d} w_l(j)e^{2i\pi <x, j>} $$. If $r(x) = (u* v)(x) = \int_{\mathbb{R}^n} v(y)u(x - y)dy: D \to \mathbb{R}^m$, then
+$$(\mathcal{F} r)(j) = (\mathcal{F} u) (j) \cdot (\mathcal{F} v) (j)$$ or $$r = \mathcal{F}^{-1} ((\mathcal{F} u)  \cdot (\mathcal{F} v))$$
+
+With this in mind, let kernel $\kappa(x, y) = \kappa(x - y)$ be translationally invariant. Then, by the convolution theorem,
+\begin{align*}
+    (\mathcal{K}_tv_t)(x) &= \mathcal{F}^{-1} ((\mathcal{F} \kappa)  \cdot (\mathcal{F} v_t))(x) \\
+     &= \mathcal{F}^{-1} (R_{\phi}  \cdot (\mathcal{F} v_t))(x)
+\end{align*}
+
+Instead of learning $R_{\phi}(k): \mathbb{Z}^d \to \mathbb{C}^{d_{t + 1} \times d_t}$ for every integer $k$. The Fourier series is truncated to a maximal set of modes of size $k_{max}$ where $k_{max} = |Z_{max}| = \{k: \mathbb{Z}^d: |k_j| \leq k_{max, j}, j = 1, \dots, d\}$. So, now learning a complex matrix of size $k_{max} \times d_{t + 1} \times d_t$. However, this rectangular truncation set doesn't necessarily naturally focus on the low frequency modes of $v_t(x)$ as it's far too loose. And an $l_1$ norm-based set would be more appropriate but the rectangle set provides ease in implementation. Since we want real-valued $v_{t + 1}$ and $v_t$, we require a real-valued kernel $\kappa$ which can imposed through conjugate symmetry:
+$$R(-k)_{j, l} = R^*(k)_{j, l}$$
+for all $k \in Z_{k_{max}}, j \in [d_{t + 1}], l \in [d_{t}]$.
+
+Since $D$ is discretized into $J$ points, then $v_t \in \mathbb{R}^{J \times d_{t}}$, the fourier transform after truncation will be $\mathcal{F}(v_t) \in \mathbb{C}^{k_{max} \times d_{t + 1}}$, and the weight matrix will be $R \in \mathbb{C}^{k_{max} \times d_{t + 1}\times d_{t}}$. And so the dot product between $R$ and $\mathcal{F}(v)$ amounts to
+\begin{align*}
+    (R\cdot (\mathcal{F}v_t))_{k, l} = \sum_{j =1}^{d_t} R_{k, l, j}(\mathcal{F}v_t)_{k, j}
+\end{align*}
+for $k = 1, \ldots, k_{max}$ and $j = 1, \ldots, d_{t + 1}$.
+
+If the discretization is uniform or $s_1 \times \cdots \times s_d = J$, then we can use Fast Fourier transform where:
+\begin{align*}
+    (\widehat{\mathcal{F}} v)_l(k) &= \sum_{x_1 = 0}^{s_1 - 1} \cdots \sum_{x_d = 0}^{s_d - 1} v_l(x_1, \cdots, x_d)e^{-2i\pi \sum_{j = 1}^d \frac{x_jk_j}{s_j}} \\
+    (\widehat{\mathcal{F}}^{-1} w)_l(x) &= \sum_{k_1 = 0}^{s_1 - 1} \cdots \sum_{k_d = 0}^{s_d - 1} w_l(k_1, \cdots, k_d)e^{2i\pi \sum_{j = 1}^d \frac{x_jk_j}{s_j}}
+\end{align*}
+
+$R$ can be parameterized in a number of ways. It can be directly parameterized where each $k \in Z_{k_{max}}$ has it's own Fourier transformed kernel matrix. But $R$ can be a linear parameteric function that accepts the $(k, (\mathcal{F}a)(k))$ as input and outputs a kernel matrix in the Fourier space. This is often just effecient as the direct parameterization. Using neural networks to model this relationship shows worse empirical performance. 
+
+\subsection{Multigrid Neural Operators}
+
+\section{Numerical Solutions - Physics informed neural networks}
+ 
+\end{document}
