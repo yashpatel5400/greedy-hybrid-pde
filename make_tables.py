@@ -26,7 +26,8 @@ POL_NAMES = {"classical": "Solver only", "hints25": "HINTS ($\\tau{=}25$)",
              "hints5": "HINTS ($\\tau{=}5$)", "hints10": "HINTS ($\\tau{=}10$)",
              "hints50": "HINTS ($\\tau{=}50$)", "greedy": "Greedy oracle (Alg.~1)",
              "oracle": "Cost-aware oracle", "router": "Learned router (ours)"}
-EQS = ["Poisson", "ConvDiff"]
+EQS = ["Poisson", "ConvDiff", "AnisoDiff"]
+EQ_NAMES = {"Poisson": "Poisson", "ConvDiff": "ConvDiff", "AnisoDiff": "AnisoDiff"}
 
 
 RESULTS_DIR = os.environ.get("RESULTS_DIR", "results")
@@ -106,7 +107,9 @@ def cell_time(rows, base_rows, key, bold=False):
     med = np.median(ts)
     cens = int((~np.isfinite(ts)).sum())
     if cens > len(ts) / 2:
-        return "--"
+        # majority censored: report the (median) time spent up to the iteration cap as a lower bound
+        cap = np.median([r.get("t_total_live", np.nan) for r in rows])
+        return f"$>${fmt_time(cap)}$^{{\\dagger {cens}}}$" if np.isfinite(cap) else "--"
     sp, _ = paired_speedup(tb, ts)
     s = fmt_time(med)
     if rows is not base_rows:
@@ -156,7 +159,7 @@ def main():
                    cell_time(P["router"], base, key, bold=(best_dep == "router"))]
             out.append(" & ".join(row) + " \\\\")
             first = False
-        if eq == "Poisson":
+        if eq != EQS[-1] and any(k[0] == EQS[EQS.index(eq)+1] for k in R):
             out.append("\\midrule")
     out.append("\\bottomrule\n\\end{tabular}}")
 
@@ -197,7 +200,7 @@ def main():
                     cells.append(s)
             out.append(" & ".join([eq if first else "", SOLVER_NAMES[spec]] + cells) + " \\\\")
             first = False
-        if eq == "Poisson":
+        if eq != EQS[-1] and any(k[0] == EQS[EQS.index(eq)+1] for k in R):
             out.append("\\midrule")
     out.append("\\bottomrule\n\\end{tabular}}")
 
@@ -230,20 +233,22 @@ def main():
 
     # ------------------------------------------- AUC / final error (paper style)
     T = None
+    eqs_present = [eq for eq in EQS if any(k[0] == eq and not k[3] for k in R)]
     out.append("\\newcommand{\\caauc}{")
-    out.append("\\begin{tabular}{lcccccc}\n\\toprule")
-    out.append("& \\multicolumn{3}{c}{Poisson} & \\multicolumn{3}{c}{ConvDiff} \\\\ \\cmidrule(lr){2-4}\\cmidrule(lr){5-7}")
-    out.append("Method & $\\|e^{(T)}_h\\|/\\|u_h\\|$ & AUC & $p$ & $\\|e^{(T)}_h\\|/\\|u_h\\|$ & AUC & $p$ \\\\ \\midrule")
+    out.append("\\begin{tabular}{l" + "ccc" * len(eqs_present) + "}\n\\toprule")
+    out.append("& " + " & ".join(f"\\multicolumn{{3}}{{c}}{{{EQ_NAMES[eq]}}}" for eq in eqs_present) + " \\\\ "
+               + "".join(f"\\cmidrule(lr){{{2+3*i}-{4+3*i}}}" for i in range(len(eqs_present))))
+    out.append("Method & " + " & ".join("$\\|e^{(T)}_h\\|/\\|u_h\\|$ & AUC & $p$" for _ in eqs_present) + " \\\\ \\midrule")
     for spec in SOLVER_ORDER:
         have = [(eq, R[[k for k in R if k[0] == eq and k[2] == spec and not k[3]][0]])
                 for eq in EQS if [k for k in R if k[0] == eq and k[2] == spec and not k[3]]]
         if not have:
             continue
         T = have[0][1][0]["args"]["T"]
-        out.append(f"\\multicolumn{{7}}{{c}}{{{SOLVER_NAMES[spec]}-related solvers}} \\\\ \\midrule")
+        out.append(f"\\multicolumn{{{1+3*len(eqs_present)}}}{{c}}{{{SOLVER_NAMES[spec]}-related solvers}} \\\\ \\midrule")
         for pol in ["classical", "hints25", "router", "oracle"]:
             row = [POL_NAMES[pol]]
-            for eq in EQS:
+            for eq in eqs_present:
                 m = dict(have).get(eq)
                 if m is None:
                     row += ["--", "--", "--"]
@@ -302,7 +307,7 @@ def main():
                 cells += [f"{np.median(it):.0f}", f"{np.nanmedian(nno):.0f}"]
             out.append(" & ".join([eq if first else "", SOLVER_NAMES[spec]] + cells) + " \\\\")
             first = False
-        if eq == "Poisson":
+        if eq != EQS[-1] and any(k[0] == EQS[EQS.index(eq)+1] for k in R):
             out.append("\\midrule")
     out.append("\\bottomrule\n\\end{tabular}}")
 
@@ -321,7 +326,7 @@ def main():
             out.append(" & ".join([eq if first else "", SOLVER_NAMES[spec], f"{c[spec]*1e6:.0f}\\,$\\mu$s",
                                    f"{c['no']*1e6:.0f}\\,$\\mu$s", str(g["m"][0]), str(g["m"][-1])]) + " \\\\")
             first = False
-        if eq == "Poisson":
+        if eq != EQS[-1] and any(k[0] == EQS[EQS.index(eq)+1] for k in R):
             out.append("\\midrule")
     out.append("\\bottomrule\n\\end{tabular}}")
 
@@ -494,7 +499,7 @@ def main():
                 P = g["policies"]
                 for pol, lab in [("hints25", f"HINTS ($\\tau{{=}}25$), {SOLVER_NAMES[best_s]}"),
                                  ("router", f"Learned router, $\\{{\\mathrm{{NO}}, \\text{{{SOLVER_NAMES[best_s]}}}\\}}$")]:
-                    cells = [med_str(times(P[pol], tkey(dd, t)), ref) for t in tl]
+                    cells = [med_str(times(P[pol], tkey(dd, t)), ref if pol != "router" else None) for t in tl]
                     cells.append(f"{np.median(iters(P[pol], tkey(dd, dd['h2']))):.0f}")
                     row = " & ".join(["", lab] + cells) + " \\\\"
                     out.append(f"\\textbf{{{row}}}" if False else row)
@@ -503,7 +508,7 @@ def main():
                 P = g["policies"]
                 for pol, lab in [("router", "Learned router, $\\{\\mathrm{NO}, \\text{Multigrid}\\}$"),
                                  ("oracle", "Cost-aware oracle, $\\{\\mathrm{NO}, \\text{Multigrid}\\}$")]:
-                    cells = [med_str(times(P[pol], tkey(dd, t)), ref) for t in tl]
+                    cells = [med_str(times(P[pol], tkey(dd, t))) for t in tl]
                     cells.append(f"{np.median(iters(P[pol], tkey(dd, dd['h2']))):.0f}")
                     out.append(" & ".join(["", lab] + cells) + " \\\\")
             if eq == "Poisson":
@@ -674,7 +679,7 @@ def main():
                 cells += ["--", "--", "--"]
             out.append(" & ".join([eq if first else "", SOLVER_NAMES[spec]] + cells) + " \\\\")
             first = False
-        if eq == "Poisson":
+        if eq != EQS[-1] and any(k[0] == EQS[EQS.index(eq)+1] for k in R):
             out.append("\\midrule")
     out.append("\\bottomrule\n\\end{tabular}}")
 
@@ -703,7 +708,7 @@ def main():
                                    pstr(wilcoxon_p(pw[bp], t_e)), pstr(wilcoxon_p(t_e, pw[bp])),
                                    pstr(wilcoxon_p(t_e, t_o))]) + " \\\\")
             first = False
-        if eq == "Poisson":
+        if eq != EQS[-1] and any(k[0] == EQS[EQS.index(eq)+1] for k in R):
             out.append("\\midrule")
     out.append("\\bottomrule\n\\end{tabular}}")
 
@@ -737,10 +742,11 @@ def main():
     for (eq, N), d in Bf.items():
         if N != 128:
             continue
-        pw = {k[2]: R[k] for k in R if k[0] == eq and k[1] == N and not k[3] and k[2] == "gs"}
+        pw = {k[2]: R[k] for k in R if k[0] == eq and k[1] == N and not k[3] and k[2] in SOLVER_ORDER}
         if not pw:
             continue
-        dd, g = pw["gs"]
+        best_s = min(pw, key=lambda s_: np.median(times(pw[s_][1]["policies"]["router"], tkey(pw[s_][0], d["h2"]))))
+        dd, g = pw[best_s]
         key = tkey(dd, dd["h2"])
         t_r = times(g["policies"]["router"], key)
         if "mg" in d["methods"]:

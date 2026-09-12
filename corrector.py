@@ -42,36 +42,34 @@ from fast_pde import FastStencilPDE, GRF2D, demean, l2
 # ---------------------------------------------------------------------------
 
 class BandTransfer:
-    """FFT-based restriction N -> n_c and prolongation n_c -> N on the periodic
-    grid. Only modes |k| <= kmax = n_c/2 - 1 are retained."""
+    """FFT-based restriction N -> (n_cx, n_cy) and prolongation back on the
+    periodic grid. Modes |k_x| <= n_cx/2 - 1 and |k_y| <= n_cy/2 - 1 are
+    retained (a square band when n_cx == n_cy; an anisotropic band otherwise,
+    e.g. n_cx = N keeps every mode along x)."""
 
-    def __init__(self, N, n_c):
-        assert N % 2 == 0 and n_c % 2 == 0 and n_c < N
-        self.N, self.n_c = N, n_c
-        self.kmax = n_c // 2 - 1
-        k = self.kmax
+    def __init__(self, N, n_cx, n_cy=None):
+        n_cy = n_cx if n_cy is None else n_cy
+        assert N % 2 == 0 and n_cx % 2 == 0 and n_cy % 2 == 0 and n_cx <= N and n_cy <= N
+        self.N, self.n_cx, self.n_cy = N, n_cx, n_cy
+        self.n_c = n_cx  # backwards compatibility (square band)
+        self.kmax_x = n_cx // 2 - 1
+        self.kmax_y = n_cy // 2 - 1
+        kx, ky = self.kmax_x, self.kmax_y
         # index sets in fft layout for the first axis, rfft layout for the last
-        self.ix_fine = np.concatenate([np.arange(0, k + 1), np.arange(N - k, N)])
-        self.ix_coarse = np.concatenate([np.arange(0, k + 1), np.arange(n_c - k, n_c)])
-        self.ny = k + 1  # last-axis (rfft) modes 0..k
+        self.ix_fine = np.concatenate([np.arange(0, kx + 1), np.arange(N - kx, N)])
+        self.ix_coarse = np.concatenate([np.arange(0, kx + 1), np.arange(n_cx - kx, n_cx)])
+        self.ny = ky + 1  # last-axis (rfft) modes 0..ky
 
     def restrict(self, r):
-        """r: (..., N, N) real -> (..., n_c, n_c) real (band-limited)."""
+        """r: (..., N, N) real -> (..., n_cx, n_cy) real (band-limited)."""
         rhat = np.fft.rfft2(r, axes=(-2, -1), norm="forward")
         sub = rhat[..., self.ix_fine, :][..., :self.ny]
-        chat = np.zeros(r.shape[:-2] + (self.n_c, self.n_c // 2 + 1), dtype=np.complex128)
+        chat = np.zeros(r.shape[:-2] + (self.n_cx, self.n_cy // 2 + 1), dtype=np.complex128)
         chat[..., self.ix_coarse, :self.ny] = sub
-        return np.fft.irfft2(chat, s=(self.n_c, self.n_c), axes=(-2, -1), norm="forward")
-
-    def restrict_hat(self, rhat_fine):
-        """Restriction from an already computed fine rfft2 (norm='forward')."""
-        sub = rhat_fine[..., self.ix_fine, :][..., :self.ny]
-        chat = np.zeros(rhat_fine.shape[:-2] + (self.n_c, self.n_c // 2 + 1), dtype=np.complex128)
-        chat[..., self.ix_coarse, :self.ny] = sub
-        return np.fft.irfft2(chat, s=(self.n_c, self.n_c), axes=(-2, -1), norm="forward")
+        return np.fft.irfft2(chat, s=(self.n_cx, self.n_cy), axes=(-2, -1), norm="forward")
 
     def prolong(self, c):
-        """c: (..., n_c, n_c) real -> (..., N, N) real, exact for band-limited c."""
+        """c: (..., n_cx, n_cy) real -> (..., N, N) real, exact for band-limited c."""
         chat = np.fft.rfft2(c, axes=(-2, -1), norm="forward")
         fhat = np.zeros(c.shape[:-2] + (self.N, self.N // 2 + 1), dtype=np.complex128)
         sub = chat[..., self.ix_coarse, :][..., :self.ny]
@@ -83,13 +81,14 @@ class BandTransfer:
 # DeepONet on the sensor grid
 # ---------------------------------------------------------------------------
 
-def fourier_features(coords, kmax, nonredundant=False):
+def fourier_features(coords, kmax, nonredundant=False, kmax_y=None):
     """coords (M, 2) in [0,1)^2 -> (M, F) features cos/sin(2 pi k . x) for
-    integer k with |k_i| <= kmax. With nonredundant=True only one k of each
-    (k, -k) pair is kept (plus the constant), which gives an orthogonal real
-    basis of the band with F = 2 * (#half-plane modes) + 1 = (2 kmax + 1)^2."""
-    ks = np.arange(-kmax, kmax + 1)
-    kx, ky = np.meshgrid(ks, ks, indexing="ij")
+    integer k with |k_x| <= kmax, |k_y| <= kmax_y (default kmax). With
+    nonredundant=True only one k of each (k, -k) pair is kept (plus the
+    constant), which gives an orthogonal real basis of the band with
+    F = 2 * (#half-plane modes) + 1 = (2 kmax + 1)(2 kmax_y + 1)."""
+    kmax_y = kmax if kmax_y is None else kmax_y
+    kx, ky = np.meshgrid(np.arange(-kmax, kmax + 1), np.arange(-kmax_y, kmax_y + 1), indexing="ij")
     K = np.stack([kx.ravel(), ky.ravel()], axis=1).astype(np.float64)  # (F/2, 2)
     if nonredundant:
         half = (K[:, 0] > 0) | ((K[:, 0] == 0) & (K[:, 1] > 0))
@@ -106,20 +105,23 @@ def fourier_features(coords, kmax, nonredundant=False):
 
 class CoarseDeepONet(nn.Module):
     def __init__(self, n_c, p=1024, hidden=1024, layers=3, trunk_hidden=512,
-                 trunk_layers=2, trunk_kmax=None, skip=True, trunk="fourier", mlp=True):
+                 trunk_layers=2, trunk_kmax=None, skip=True, trunk="fourier", mlp=True, n_cy=None):
         super().__init__()
         self.n_c = n_c
+        self.n_cx, self.n_cy = n_c, (n_c if n_cy is None else n_cy)
         self.trunk_kind = trunk
-        d_in = n_c * n_c
+        d_in = self.n_cx * self.n_cy
         self.use_mlp = bool(mlp)
         if trunk == "fourier":
             # fixed orthogonal Fourier basis of the band as the trunk output
             # (POD-DeepONet style fixed trunk); p is then the basis size
-            kmax = trunk_kmax if trunk_kmax is not None else n_c // 2 - 1
-            xs = np.linspace(0, 1, n_c + 1)[:-1]
-            Xg, Yg = np.meshgrid(xs, xs, indexing="ij")
+            kmax = trunk_kmax if trunk_kmax is not None else self.n_cx // 2 - 1
+            kmax_y = self.n_cy // 2 - 1
+            xs = np.linspace(0, 1, self.n_cx + 1)[:-1]
+            ys = np.linspace(0, 1, self.n_cy + 1)[:-1]
+            Xg, Yg = np.meshgrid(xs, ys, indexing="ij")
             coords = np.stack([Xg.ravel(), Yg.ravel()], axis=1)
-            B = fourier_features(coords, kmax, nonredundant=True)
+            B = fourier_features(coords, kmax, nonredundant=True, kmax_y=kmax_y)
             p = B.shape[1]
             self.register_buffer("fixed_basis", torch.tensor(B))
         self.p = p
@@ -140,8 +142,9 @@ class CoarseDeepONet(nn.Module):
         self.branch_skip = nn.Linear(d_in, p, bias=False) if skip else None
         if trunk == "mlp":
             kmax = trunk_kmax if trunk_kmax is not None else n_c // 2 - 1
-            xs = np.linspace(0, 1, n_c + 1)[:-1]
-            Xg, Yg = np.meshgrid(xs, xs, indexing="ij")
+            xs = np.linspace(0, 1, self.n_cx + 1)[:-1]
+            ys = np.linspace(0, 1, self.n_cy + 1)[:-1]
+            Xg, Yg = np.meshgrid(xs, ys, indexing="ij")
             coords = np.stack([Xg.ravel(), Yg.ravel()], axis=1)
             feats = fourier_features(coords, kmax)
             self.register_buffer("trunk_in", torch.tensor(feats))
@@ -184,10 +187,11 @@ class DeepONetCorrector:
         ckp = torch.load(path, map_location="cpu", weights_only=False)
         a = ckp["args"]
         self.N, self.n_c = a["N"], a["n_c"]
-        self.model = CoarseDeepONet(self.n_c, p=a["p"], hidden=a["hidden"], layers=a["layers"],
+        self.n_cx, self.n_cy = a.get("n_cx", a["n_c"]), a.get("n_cy", a["n_c"])
+        self.model = CoarseDeepONet(self.n_cx, p=a["p"], hidden=a["hidden"], layers=a["layers"],
                                     trunk_hidden=a["trunk_hidden"], trunk_layers=a["trunk_layers"],
                                     skip=a.get("skip", True), trunk=a.get("trunk", "fourier"),
-                                    mlp=bool(a.get("mlp", 1)))
+                                    mlp=bool(a.get("mlp", 1)), n_cy=self.n_cy)
         self.model.load_state_dict(ckp["model"])
         self.model.eval()
         with torch.no_grad():
@@ -209,7 +213,7 @@ class DeepONetCorrector:
         self.branch = self.model.branch
         self.in_scale = float(ckp.get("input_scale", 1.0))
         self.inv_scale = 1.0 / ckp["target_scale"]
-        self.transfer = BandTransfer(self.N, self.n_c)
+        self.transfer = BandTransfer(self.N, self.n_cx, self.n_cy)
         self.args = a
 
     def _net(self, xc):
@@ -220,7 +224,7 @@ class DeepONetCorrector:
             y = x @ self.A_lin if self.A_lin is not None else 0.0
             if self.A_mlp is not None:
                 y = y + self.hidden_net(x) @ self.A_mlp + self.c
-        return y.numpy().astype(np.float64).reshape(B, self.n_c, self.n_c)
+        return y.numpy().astype(np.float64).reshape(B, self.n_cx, self.n_cy)
 
     def _net_reference(self, xc):
         """Unfolded evaluation (for checking the folded weights)."""
@@ -228,7 +232,7 @@ class DeepONetCorrector:
         x = torch.from_numpy((xc.reshape(B, -1) * self.in_scale).astype(np.float32))
         with torch.no_grad():
             y = self.branch(x) @ self.basis_T
-        return y.numpy().astype(np.float64).reshape(B, self.n_c, self.n_c)
+        return y.numpy().astype(np.float64).reshape(B, self.n_cx, self.n_cy)
 
     def correct(self, r):
         """r: (B, N, N) residual -> additive correction du (B, N, N)."""
@@ -298,9 +302,12 @@ def train(args):
     tag = f"deeponet_{args.equation}_{args.N}"
     device = torch.device(args.device)
     pde = FastStencilPDE(args.N, equation=args.equation, b_vec=(args.b_vel, args.b_vel))
-    n_c = args.N // args.coarsen
-    transfer = BandTransfer(args.N, n_c)
-    M = n_c * n_c
+    cx = args.coarsen_x if args.coarsen_x else args.coarsen
+    cy = args.coarsen_y if args.coarsen_y else args.coarsen
+    n_cx, n_cy = args.N // cx, args.N // cy
+    n_c = n_cx
+    transfer = BandTransfer(args.N, n_cx, n_cy)
+    M = n_cx * n_cy
     input_scale = math.sqrt(M)  # unit-norm inputs -> O(1) entries
 
     t0 = time.time()
@@ -323,12 +330,12 @@ def train(args):
         Ye = d["Y"].astype(np.float32) * target_scale
         extra = (Xe, Ye)
         print(f"  extra rollout pairs: {len(Xe)}")
-    print(f"[{tag}] data: {len(X)} train / {len(Xv)} val pairs on {n_c}x{n_c} sensors "
+    print(f"[{tag}] data: {len(X)} train / {len(Xv)} val pairs on {n_cx}x{n_cy} sensors "
           f"in {time.time()-t0:.1f}s; target_scale {target_scale:.3g}")
 
-    model = CoarseDeepONet(n_c, p=args.p, hidden=args.hidden, layers=args.layers,
+    model = CoarseDeepONet(n_cx, p=args.p, hidden=args.hidden, layers=args.layers,
                            trunk_hidden=args.trunk_hidden, trunk_layers=args.trunk_layers,
-                           skip=bool(args.skip), trunk=args.trunk, mlp=bool(args.mlp)).to(device)
+                           skip=bool(args.skip), trunk=args.trunk, mlp=bool(args.mlp), n_cy=n_cy).to(device)
     if init_ck is not None:
         model.load_state_dict(init_ck["model"])
         print(f"  initialised from {args.init_from}")
@@ -393,7 +400,7 @@ def train(args):
     if args.steps == 0:
         best = med
         torch.save({"model": {k: v.cpu() for k, v in model.state_dict().items()},
-                    "args": {**vars(args), "n_c": n_c}, "target_scale": target_scale,
+                    "args": {**vars(args), "n_c": n_c, "n_cx": n_cx, "n_cy": n_cy}, "target_scale": target_scale,
                     "input_scale": input_scale},
                    f"{args.ckp_dir}/{tag}{args.suffix}_best.pth")
     model.train()
@@ -446,7 +453,7 @@ def train(args):
             if med < best and (step >= stage1 or stage2 == 0):
                 best = med
                 torch.save({"model": {k: v.cpu() for k, v in model.state_dict().items()},
-                            "args": {**vars(args), "n_c": n_c}, "target_scale": target_scale,
+                            "args": {**vars(args), "n_c": n_c, "n_cx": n_cx, "n_cy": n_cy}, "target_scale": target_scale,
                             "input_scale": input_scale},
                            f"{args.ckp_dir}/{tag}{args.suffix}_best.pth")
                 mark = " *"
@@ -454,16 +461,19 @@ def train(args):
                   f"mean {mean:.2e} max {mx:.2e}  ({time.time()-t0:.0f}s){mark}", flush=True)
     with open(f"{args.ckp_dir}/{tag}{args.suffix}_meta.json", "w") as fh:
         json.dump({"best_val_median_rel": best, "target_scale": target_scale,
-                   "input_scale": input_scale, "n_params": n_params, **vars(args), "n_c": n_c},
+                   "input_scale": input_scale, "n_params": n_params, **vars(args), "n_c": n_c,
+                   "n_cx": n_cx, "n_cy": n_cy},
                   fh, indent=1)
     print(f"[{tag}] done; best val median rel err {best:.3e}")
 
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
-    p.add_argument("--equation", default="Poisson", choices=["Poisson", "ConvDiff"])
+    p.add_argument("--equation", default="Poisson", choices=["Poisson", "ConvDiff", "AnisoDiff"])
     p.add_argument("--N", type=int, default=128)
     p.add_argument("--coarsen", type=int, default=4)
+    p.add_argument("--coarsen_x", type=int, default=0, help="sensor-grid coarsening along x (0: --coarsen)")
+    p.add_argument("--coarsen_y", type=int, default=0, help="sensor-grid coarsening along y (0: --coarsen)")
     p.add_argument("--p", type=int, default=1024)
     p.add_argument("--hidden", type=int, default=1024)
     p.add_argument("--layers", type=int, default=3)

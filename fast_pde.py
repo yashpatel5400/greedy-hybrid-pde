@@ -33,26 +33,32 @@ class FastStencilPDE:
     both diffusion and advection, grid x = linspace(0, 1, N+1)[:-1], h = 1/N.
     """
 
-    def __init__(self, N, equation="Poisson", a=1.0, b_vec=(20.0, 20.0)):
-        assert equation in ("Poisson", "ConvDiff")
+    def __init__(self, N, equation="Poisson", a=1.0, b_vec=(20.0, 20.0), aniso_eps=0.01):
+        assert equation in ("Poisson", "ConvDiff", "AnisoDiff")
         self.N = N
         self.equation = equation
         self.a = a
-        self.b1, self.b2 = (0.0, 0.0) if equation == "Poisson" else b_vec
+        # anisotropic diffusion: -eps u_xx - u_yy = f (diffusion tensor diag(eps, 1))
+        self.ax, self.ay = (a * aniso_eps, a) if equation == "AnisoDiff" else (a, a)
+        self.aniso_eps = aniso_eps
+        self.b1, self.b2 = (0.0, 0.0) if equation != "ConvDiff" else b_vec
         self.h = 1.0 / N
-        self.diag = 4.0 * a / self.h ** 2
+        self.diag = 2.0 * (self.ax + self.ay) / self.h ** 2
         self._symbol = self._build_symbol()
         self._lu_cache = {}
 
     # -- operator ------------------------------------------------------------
     def apply_A(self, u):
         """u: (..., N, N). First grid axis is i (x), second is j (y)."""
-        h, a = self.h, self.a
+        h = self.h
         up_i = np.roll(u, -1, axis=-2)   # u_{i+1,j}
         dn_i = np.roll(u, 1, axis=-2)    # u_{i-1,j}
         up_j = np.roll(u, -1, axis=-1)   # u_{i,j+1}
         dn_j = np.roll(u, 1, axis=-1)    # u_{i,j-1}
-        out = a * (4.0 * u - up_i - dn_i - up_j - dn_j) / h ** 2
+        if self.ax == self.ay:
+            out = self.ax * (4.0 * u - up_i - dn_i - up_j - dn_j) / h ** 2
+        else:
+            out = (self.ax * (2.0 * u - up_i - dn_i) + self.ay * (2.0 * u - up_j - dn_j)) / h ** 2
         if self.b1 or self.b2:
             out = out + self.b1 * (up_i - dn_i) / (2 * h) + self.b2 * (up_j - dn_j) / (2 * h)
         return out
@@ -66,7 +72,7 @@ class FastStencilPDE:
         k = np.fft.fftfreq(N) * N          # integer wavenumbers
         theta_x = 2 * np.pi * k[:, None] / N
         theta_y = 2 * np.pi * k[None, :] / N
-        sym = self.a * (4 - 2 * np.cos(theta_x) - 2 * np.cos(theta_y)) / h ** 2
+        sym = (self.ax * (2 - 2 * np.cos(theta_x)) + self.ay * (2 - 2 * np.cos(theta_y))) / h ** 2
         sym = sym.astype(np.complex128)
         if self.b1 or self.b2:
             sym = sym + 1j * (self.b1 * np.sin(theta_x) + self.b2 * np.sin(theta_y)) / h
@@ -84,7 +90,8 @@ class FastStencilPDE:
 
     # -- sparse matrix (for GS / SOR triangular solves) ------------------------
     def sparse_A(self):
-        N, h, a = self.N, self.h, self.a
+        N, h = self.N, self.h
+        ax, ay = self.ax, self.ay
         idx = np.arange(N * N).reshape(N, N)
         rows, cols, vals = [], [], []
 
@@ -94,10 +101,10 @@ class FastStencilPDE:
             vals.append(np.full(N * N, val))
 
         add(idx, self.diag)
-        add(np.roll(idx, 1, axis=0), -a / h ** 2 - self.b1 / (2 * h))    # (i-1, j)
-        add(np.roll(idx, -1, axis=0), -a / h ** 2 + self.b1 / (2 * h))   # (i+1, j)
-        add(np.roll(idx, 1, axis=1), -a / h ** 2 - self.b2 / (2 * h))    # (i, j-1)
-        add(np.roll(idx, -1, axis=1), -a / h ** 2 + self.b2 / (2 * h))   # (i, j+1)
+        add(np.roll(idx, 1, axis=0), -ax / h ** 2 - self.b1 / (2 * h))    # (i-1, j)
+        add(np.roll(idx, -1, axis=0), -ax / h ** 2 + self.b1 / (2 * h))   # (i+1, j)
+        add(np.roll(idx, 1, axis=1), -ay / h ** 2 - self.b2 / (2 * h))    # (i, j-1)
+        add(np.roll(idx, -1, axis=1), -ay / h ** 2 + self.b2 / (2 * h))   # (i, j+1)
         A = sp.coo_matrix(
             (np.concatenate(vals), (np.concatenate(rows), np.concatenate(cols))),
             shape=(N * N, N * N),
@@ -331,11 +338,11 @@ class FastMultigrid:
         N = pde.N
         while N > n_coarsest:
             assert N % 2 == 0
-            lp = FastStencilPDE(N, equation=pde.equation, a=pde.a, b_vec=(pde.b1, pde.b2))
+            lp = FastStencilPDE(N, equation=pde.equation, a=pde.a, b_vec=(pde.b1, pde.b2), aniso_eps=pde.aniso_eps)
             sm = FastGaussSeidel(lp) if smoother == "gs" else FastJacobi(lp, 0.8)
             self.levels.append((lp, sm))
             N //= 2
-        self.coarse = FastStencilPDE(N, equation=pde.equation, a=pde.a, b_vec=(pde.b1, pde.b2))
+        self.coarse = FastStencilPDE(N, equation=pde.equation, a=pde.a, b_vec=(pde.b1, pde.b2), aniso_eps=pde.aniso_eps)
         self.name = "mg"
         self.n_levels = len(self.levels) + 1
 

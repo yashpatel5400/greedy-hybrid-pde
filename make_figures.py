@@ -21,7 +21,8 @@ from corrector import DeepONetCorrector
 SOLVER_NAMES = {"jacobi": "Jacobi", "jacobi_0.67": "Jacobi (0.67)", "gs": "GS",
                 "ssor": "SymGS", "sor_1.5": "SOR (1.5)"}
 SOLVER_ORDER = ["jacobi", "jacobi_0.67", "gs", "ssor", "sor_1.5"]
-EQS = ["Poisson", "ConvDiff"]
+EQS = ["Poisson", "ConvDiff", "AnisoDiff"]
+EQ_NAMES = {"Poisson": "Poisson", "ConvDiff": "ConvDiff", "AnisoDiff": "AnisoDiff"}
 OUT = "paper/neurips_images"
 os.makedirs(OUT, exist_ok=True)
 plt.rcParams.update({"font.size": 9, "axes.titlesize": 9, "axes.labelsize": 9,
@@ -44,8 +45,9 @@ def load():
 
 
 def fig_predictions(N=128, seed=72, idx=(0, 1)):
-    fig, axes = plt.subplots(2 * len(EQS), 4, figsize=(9.2, 2.2 * 2 * len(EQS)))
-    for ei, eq in enumerate(EQS):
+    eqs = [eq for eq in EQS if os.path.exists(f"checkpoints/deeponet_{eq}_{N}_best.pth")]
+    fig, axes = plt.subplots(2 * len(eqs), 4, figsize=(9.2, 2.2 * 2 * len(eqs)))
+    for ei, eq in enumerate(eqs):
         pde = FastStencilPDE(N, equation=eq)
         corr = DeepONetCorrector(f"checkpoints/deeponet_{eq}_{N}_best.pth")
         f = GRF2D(N, rng=np.random.default_rng(seed)).sample(max(idx) + 1)

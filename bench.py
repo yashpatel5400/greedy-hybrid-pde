@@ -26,7 +26,7 @@ from hybrid import Env, FeatureState, measure_costs, run_untimed, run_timed, tim
 from router import Router, fit_router
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--equation", default="Poisson", choices=["Poisson", "ConvDiff"])
+parser.add_argument("--equation", default="Poisson", choices=["Poisson", "ConvDiff", "AnisoDiff"])
 parser.add_argument("--N", type=int, default=128)
 parser.add_argument("--solvers", default="jacobi,jacobi_0.67,gs,ssor,sor_1.5")
 parser.add_argument("--ensemble", action="store_true")
@@ -46,6 +46,8 @@ parser.add_argument("--router_inst", type=int, default=128)
 parser.add_argument("--router_seed", type=int, default=555)
 parser.add_argument("--dagger_rounds", type=int, default=2)
 parser.add_argument("--router_max_epochs", type=int, default=3000)
+parser.add_argument("--router_hidden", type=int, default=64)
+parser.add_argument("--router_epochs", type=int, default=150)
 parser.add_argument("--router_err_stop", type=float, default=1e-9)
 parser.add_argument("--timed_reps", type=int, default=1)
 parser.add_argument("--keep_curves", type=int, default=4, help="instances whose full error curves are stored")
@@ -122,7 +124,8 @@ for group in groups:
             router = fit_router(env, n_inst=args.router_inst, seed=args.router_seed,
                                 dagger_rounds=args.dagger_rounds, rate=args.rate,
                                 max_epochs=(args.max_ops if args.rate else args.router_max_epochs),
-                                err_stop=args.router_err_stop)
+                                err_stop=args.router_err_stop, hidden=args.router_hidden,
+                                epochs=args.router_epochs)
             router.save(rpath, meta={"costs": costs, "m": env.m, "ops": env.ops})
             torch.set_num_threads(1)
             print(f"  trained router in {time.time()-t0:.0f}s -> {rpath}", flush=True)

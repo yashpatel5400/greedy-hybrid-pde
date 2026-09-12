@@ -20,7 +20,7 @@ from hybrid import Env, run_untimed, run_timed, time_to_tol
 from baselines import run_krylov_untimed, time_krylov, KRYLOV
 
 p = argparse.ArgumentParser()
-p.add_argument("--equation", default="Poisson", choices=["Poisson", "ConvDiff"])
+p.add_argument("--equation", default="Poisson", choices=["Poisson", "ConvDiff", "AnisoDiff"])
 p.add_argument("--N", type=int, default=128)
 p.add_argument("--n_test", type=int, default=64)
 p.add_argument("--seed", type=int, default=72)
@@ -35,7 +35,7 @@ h2 = 1.0 / args.N ** 2
 tols = [h2 if t == "h2" else float(t) for t in args.tols.split(",")]
 if args.methods:
     methods = args.methods.split(",")
-elif args.equation == "Poisson":
+elif args.equation in ("Poisson", "AnisoDiff"):
     methods = ["fft", "mg", "cg", "pcg_ssor", "pcg_mg"]
 else:
     methods = ["fft", "mg", "bicgstab", "bicgstab_mg", "gmres"]
