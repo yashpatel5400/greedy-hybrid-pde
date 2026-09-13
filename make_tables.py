@@ -63,6 +63,14 @@ def iters(rows, key):
     return np.array([np.inf if r["tol"][key]["iters"] is None else r["tol"][key]["iters"] for r in rows])
 
 
+def times_lb(rows, key, field="t_live"):
+    """Like times(), but a censored run (tolerance not reached within the iteration cap)
+    enters at the time it spent up to the cap, a lower bound on its true time-to-tolerance.
+    Used for the *baseline* side of the paired tests, where it is conservative."""
+    tot = "t_total_live" if field == "t_live" else "t_total_wu"
+    return np.array([r[tot] if r["tol"][key][field] is None else r["tol"][key][field] for r in rows])
+
+
 def fmt_time(x):
     if not np.isfinite(x):
         return "--"
@@ -396,14 +404,20 @@ def main():
                 P = g["policies"]
                 members = k[2].split("+")
                 # best member solver alone, from the pairwise runs (same instances)
-                cls = {}
+                cls, lbs = {}, {}
                 for s_ in members:
                     kk = [q for q in R if q[0] == eq and q[1] == MAIN_N and q[2] == s_ and not q[3]]
                     if kk:
                         cls[s_] = np.median(times(R[kk[0]][1]["policies"]["classical"],
                                                   tkey(R[kk[0]][0], d["h2"])))
+                        lbs[s_] = np.median(times_lb(R[kk[0]][1]["policies"]["classical"],
+                                                     tkey(R[kk[0]][0], d["h2"])))
                 bc = min(cls, key=cls.get)
                 bc_name = SOLVER_NAMES[bc]
+                if np.isfinite(cls[bc]):
+                    bc_cell = f"{fmt_time(cls[bc])} ({bc_name})"
+                else:  # no member reaches the tolerance within the cap: lower bound
+                    bc_cell = f"$>${fmt_time(min(lbs.values()))}$^{{\\dagger}}$ (none)"
                 base = R[[q for q in R if q[0] == eq and q[1] == MAIN_N and q[2] == bc and not q[3]][0]][1]["policies"]["classical"]
                 # best pairwise router (from pairwise runs)
                 pw = {}
@@ -421,13 +435,13 @@ def main():
                 ens_vs_solver.append(cls[bc] / np.median(t_ens))
                 wname = "\\{" + ", ".join(SOLVER_NAMES[s] for s in members) + "\\}"
                 row = [eq if first else "", f"${wname}$",
-                       f"{fmt_time(cls[bc])} ({bc_name})",
+                       bc_cell,
                        f"{fmt_time(np.median(t_pw))} ({SOLVER_NAMES[bp]})",
                        f"{fmt_time(np.median(t_ens))} ({fmt_sp(sp_pw)} vs pairwise)",
                        "\\textit{" + fmt_time(np.median(times(P['oracle'], key))) + "}"]
                 out.append(" & ".join(row) + " \\\\")
                 first = False
-            if eq == "Poisson":
+            if eq != EQS[-1] and any(k[0] == EQS[EQS.index(eq)+1] for k in ens_keys):
                 out.append("\\midrule")
         out.append("\\bottomrule\n\\end{tabular}}")
         # ensemble usage
@@ -453,7 +467,7 @@ def main():
                 wname = "\\{" + ", ".join(SOLVER_NAMES[s] for s in members) + "\\}"
                 out.append(" & ".join([eq if first else "", f"${wname}$"] + cells) + " \\\\")
                 first = False
-            if eq == "Poisson":
+            if eq != EQS[-1] and any(k[0] == EQS[EQS.index(eq)+1] for k in ens_keys):
                 out.append("\\midrule")
         out.append("\\bottomrule\n\\end{tabular}}")
 
@@ -671,10 +685,10 @@ def main():
                 t_r = times(P["router"], key)
                 bt = min(taus, key=lambda p_: np.median(times(P[p_], key)))
                 if with_solver:
-                    t_c = times(P["classical"], key)
+                    t_c = times_lb(P["classical"], key)
                     cells.append(f"{pstr(wilcoxon_p(t_c, t_r))} / {pstr(ttest_p(t_c, t_r))}")
-                cells.append(f"{pstr(wilcoxon_p(times(P['hints25'], key), t_r))} / {pstr(ttest_p(times(P['hints25'], key), t_r))}")
-                cells.append(f"{pstr(wilcoxon_p(times(P[bt], key), t_r))} / {pstr(ttest_p(times(P[bt], key), t_r))}")
+                cells.append(f"{pstr(wilcoxon_p(times_lb(P['hints25'], key), t_r))} / {pstr(ttest_p(times_lb(P['hints25'], key), t_r))}")
+                cells.append(f"{pstr(wilcoxon_p(times_lb(P[bt], key), t_r))} / {pstr(ttest_p(times_lb(P[bt], key), t_r))}")
             # seeds
             sd = Sf.get((eq, keys[0][1]))
             if sd and spec in sd["groups"] and sd["groups"][spec] and all("t_wu" in blk["rows"][0]["tol"][tkey(d, d["h2"])] for blk in sd["groups"][spec].values()):
@@ -719,7 +733,7 @@ def main():
             for s_ in members:
                 kk = [q for q in R if q[0] == eq and q[1] == MAIN_N and q[2] == s_ and not q[3]]
                 if kk:
-                    cls[s_] = times(R[kk[0]][1]["policies"]["classical"], tkey(R[kk[0]][0], d["h2"]))
+                    cls[s_] = times_lb(R[kk[0]][1]["policies"]["classical"], tkey(R[kk[0]][0], d["h2"]))
             bc = min(cls, key=lambda s_: np.median(cls[s_]))
             pw = {s_: times(R[[q for q in R if q[0] == eq and q[1] == MAIN_N and q[2] == s_ and not q[3]][0]][1]["policies"]["router"], key) for s_ in members if [q for q in R if q[0] == eq and q[1] == MAIN_N and q[2] == s_ and not q[3]]}
             bp = min(pw, key=lambda s_: np.median(pw[s_]))
