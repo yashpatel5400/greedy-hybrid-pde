@@ -27,6 +27,8 @@ The experiments of \Cref{sec:experiments} compare methods per iteration, which f
 
 \paragraph{Where the time goes.} \Cref{tab:ca_usage} explains the numbers: with a corrector that removes the smooth band to $10^{-6}$ in one call, the cost-aware oracle and the router call it first and reach $h^2$ after one or two further sweeps, i.e., in about two iterations, whereas HINTS reaches the same accuracy only at its first scheduled call (iteration $\tau$), having spent $\tau{-}1$ sweeps on an error that is almost entirely smooth. Below $h^2$ the remaining error is the high-frequency band that the corrector cannot see; the router therefore stops calling it (one to three calls in total down to $10^{-8}$; \Cref{fig:ca_usage}), whereas a fixed schedule keeps paying for a call every $\tau$ iterations---HINTS ($\tau{=}5$) executes hundreds of useless calls on the Jacobi pairings (\Cref{tab:ca_tol_poisson}). The cost-agnostic greedy oracle (\Cref{alg:greedy} on single operations) makes the same decisions as its cost-aware counterpart here, because after the first call the corrector is never better than a single sweep on the remaining high-frequency error; the two rules differ only through the granularity of their decisions, and the learned router pays for neither.
 
+\paragraph{Anisotropic diffusion.} The anisotropic equation is where the two components of the hybrid are most complementary and where the classical baselines are weakest: the point smoothers cannot damp the $x_1$-oscillatory modes at all (\Cref{tab:ca_tol_aniso}: none of the five solvers alone reaches $h^2$ within $60{,}000$ iterations), whereas the corrector, whose sensor grid keeps full resolution along $x_1$, removes exactly those modes together with the smooth ones in a single call and leaves the smoother only the $x_2$-oscillatory band, which it damps at the isotropic rate. Consequently the learned router reaches $h^2$ in about $1$\,ms for every pairing---the same absolute time as on the isotropic equations---while HINTS ($\tau{=}25$) needs $3$--$10$\,ms and the best fixed period $1.2$--$2.4$\,ms (\Cref{tab:ca_main,tab:ca_vshints}); the router again matches the cost-aware oracle. The multigrid and Krylov baselines are not run for this equation: with point smoothing, the V-cycle's contraction factor degrades from $\approx 0.03$ to $\approx 0.85$ per cycle (line relaxation or semi-coarsening would be required), so the comparison of \Cref{sec:wallclock_strong} would not be informative.
+
 \paragraph{Iteration-based metrics.} \Cref{tab:ca_auc} confirms that the iteration-count conclusions of \Cref{sec:experiments} hold on the finer grid: the router's AUC over $T = \caT$ iterations is three to four orders of magnitude below HINTS' and four to five below the solver-only baseline (all $p < 10^{-3}$), and its error after $T$ iterations is at the stopping threshold of the runs ($10^{-9}$) except for undamped Jacobi, where all hybrids stall at the near-Nyquist band.
 
 
@@ -76,6 +78,14 @@ The experiments of \Cref{sec:experiments} compare methods per iteration, which f
 \caption{Convection--diffusion on the $\caN\times\caN$ grid: median wall-clock time to relative error $\varepsilon$ for every policy and pairing ($64$ instances).}
 \resizebox{\textwidth}{!}{\cawctolconv}
 \label{tab:ca_tol_convdiff}
+\end{table}
+
+\begin{table}[H]
+\color{red}
+\centering
+\caption{Anisotropic diffusion on the $\caN\times\caN$ grid: median wall-clock time to relative error $\varepsilon$ for every policy and pairing ($64$ instances). The point smoothers alone do not reach $h^2$ within $60{,}000$ iterations (their times are lower bounds).}
+\resizebox{\textwidth}{!}{\cawctolaniso}
+\label{tab:ca_tol_aniso}
 \end{table}
 
 \begin{figure}[H]
@@ -232,6 +242,14 @@ The tables of \Cref{sec:wallclock_strong} summarise the larger grids at $\vareps
 \caption{$256\times256$, convection--diffusion: median wall-clock time to relative error $\varepsilon$ for every policy and pairing ($32$ instances).}
 \resizebox{\textwidth}{!}{\cawctolconvB}
 \label{tab:ca_tol_convdiff_256}
+\end{table}
+
+\begin{table}[H]
+\color{red}
+\centering
+\caption{$256\times256$, anisotropic diffusion: median wall-clock time to relative error $\varepsilon$ for the Jacobi, GS and SOR pairings ($16$ instances).}
+\resizebox{\textwidth}{!}{\cawctolanisoB}
+\label{tab:ca_tol_aniso_256}
 \end{table}
 
 \begin{table}[H]
