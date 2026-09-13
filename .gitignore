@@ -13,3 +13,4 @@ train_router_test.py
 args/hierarchical_grf.json
 batch/logs/
 results_smoke/
+.DS_Store
