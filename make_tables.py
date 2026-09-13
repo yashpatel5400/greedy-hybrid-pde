@@ -746,6 +746,72 @@ def main():
             out.append("\\midrule")
     out.append("\\bottomrule\n\\end{tabular}}")
 
+    # ------------------------------------------------ larger ensemble routers (phase 6 control)
+    big_paths = sorted(glob.glob("results_ens_big/*_ens_*.json"))
+    if big_paths and ens_keys:
+        import re as _re
+
+        def _agree(path):
+            if not os.path.exists(path):
+                return None
+            m = _re.findall(r"agreement with oracle ([0-9.]+)%", open(path).read())
+            return float(m[-1]) if m else None
+        rows_big = []
+        for path in big_paths:
+            base_path = os.path.join(RESULTS_DIR, os.path.basename(path))
+            if not os.path.exists(base_path):
+                continue
+            db, dr = json.load(open(path)), json.load(open(base_path))
+            eq, N_ = db["args"]["equation"], db["args"]["N"]
+            for grp in db["groups"]:
+                key = tkey(db, db["h2"])
+                Rb, Rr, Ro = (db["groups"][grp]["policies"]["router"], dr["groups"][grp]["policies"]["router"],
+                              dr["groups"][grp]["policies"]["oracle"])
+                # work-unit times net of the per-decision cost (the wider network costs ~0.5us more per
+                # decision, which would otherwise dominate a paired test on otherwise identical op sequences)
+                t_b = times(Rb, key, field="t_wu") - iters(Rb, key) * db["groups"][grp]["router_decision_cost"]
+                t_r = times(Rr, key, field="t_wu") - iters(Rr, key) * dr["groups"][grp]["router_decision_cost"]
+                t_o = times(Ro, key, field="t_wu")
+                same = np.mean([(a["tol"][key]["iters"], a["tol"][key]["no_calls"]) == (b["tol"][key]["iters"], b["tol"][key]["no_calls"])
+                                for a, b in zip(Rr, Rb)])
+                members = grp.split("+")
+                ag_r = _agree(f"logs/routers_ens_{eq}_{N_}_{grp}.log")
+                ag_b = _agree(f"logs/routers_ensbig_{eq}_{N_}_{grp}.log")
+                rows_big.append((eq, len(members), members, t_r, t_b, t_o, ag_r, ag_b, same))
+        out.append("\\newcommand{\\caensbig}{")
+        out.append("\\begin{tabular}{llccccccc}\n\\toprule")
+        out.append("Equation & $\\mathcal{W}$ & default router & larger router & oracle & larger\\,/\\,default (medians) & same decisions & $p$ (larger faster\\,/\\,slower) & agreement (default\\,/\\,larger) \\\\ \\midrule")
+        for eq in EQS:
+            first = True
+            sel = sorted([r for r in rows_big if r[0] == eq], key=lambda r: r[1])
+            for (_, _, members, t_r, t_b, t_o, ag_r, ag_b, same) in sel:
+                wname = "\\{" + ", ".join(SOLVER_NAMES[s] for s in members) + "\\}"
+                sp = np.median(t_b) / np.median(t_r)
+                ag = ("--" if ag_r is None else f"{ag_r:.0f}\\%") + " / " + ("--" if ag_b is None else f"{ag_b:.0f}\\%")
+                out.append(" & ".join([eq if first else "", f"${wname}$", fmt_time(np.median(t_r)), fmt_time(np.median(t_b)),
+                                       "\\textit{" + fmt_time(np.median(t_o)) + "}", f"{sp:.3f}$\\times$", f"{100*same:.0f}\\%",
+                                       f"{pstr(wilcoxon_p(t_r, t_b))} / {pstr(wilcoxon_p(t_b, t_r))}", ag]) + " \\\\")
+                first = False
+            if sel and eq != EQS[-1] and any(r[0] == EQS[EQS.index(eq)+1] for r in rows_big):
+                out.append("\\midrule")
+        out.append("\\bottomrule\n\\end{tabular}}")
+        sps = [np.median(r[4]) / np.median(r[3]) for r in rows_big]
+        gaps = [np.median(r[4]) / np.median(r[5]) for r in rows_big]
+        gaps0 = [np.median(r[3]) / np.median(r[5]) for r in rows_big]
+        n_fast = sum(wilcoxon_p(r[3], r[4]) < 0.05 for r in rows_big)
+        n_slow = sum(wilcoxon_p(r[4], r[3]) < 0.05 for r in rows_big)
+        out.append(f"\\newcommand{{\\caEnsBigRatioMin}}{{{min(sps):.2f}$\\times$}}")
+        out.append(f"\\newcommand{{\\caEnsBigRatioMax}}{{{max(sps):.2f}$\\times$}}")
+        out.append(f"\\newcommand{{\\caEnsBigGapMax}}{{{100*(max(gaps)-1):.0f}\\%}}")
+        out.append(f"\\newcommand{{\\caEnsGapWuMax}}{{{100*(max(gaps0)-1):.0f}\\%}}")
+        out.append(f"\\newcommand{{\\caNumEnsBig}}{{{len(rows_big)}}}")
+        out.append(f"\\newcommand{{\\caEnsBigSameMin}}{{{100*min(r[8] for r in rows_big):.0f}\\%}}")
+        out.append(f"\\newcommand{{\\caEnsBigSameMax}}{{{100*max(r[8] for r in rows_big):.0f}\\%}}")
+        out.append(f"\\newcommand{{\\caEnsBigNFaster}}{{{n_fast}}}")
+        out.append(f"\\newcommand{{\\caEnsBigNSlower}}{{{n_slow}}}")
+    else:
+        out.append("\\newcommand{\\caensbig}{\\begin{tabular}{c}(results pending)\\end{tabular}}")
+
     # strong baselines: p-values (router with best stationary pairing vs each baseline)
     out.append("\\newcommand{\\castatsbase}{")
     out.append("\\begin{tabular}{llcccc}\n\\toprule")

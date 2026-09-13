@@ -953,6 +953,30 @@ AnisoDiff & $\{Jacobi, GS\}$ & $<10^{-10}$ & 0.315 & 0.685 & 0.014 \\
  & $\{Jacobi, GS, SymGS, Jacobi (0.67), SOR (1.5)\}$ & $<10^{-10}$ & 0.633 & 0.367 & 0.012 \\
 \bottomrule
 \end{tabular}}
+\newcommand{\caensbig}{
+\begin{tabular}{llccccccc}
+\toprule
+Equation & $\mathcal{W}$ & default router & larger router & oracle & larger\,/\,default (medians) & same decisions & $p$ (larger faster\,/\,slower) & agreement (default\,/\,larger) \\ \midrule
+Poisson & $\{Jacobi, GS\}$ & 858\,$\mu$s & 758\,$\mu$s & \textit{758\,$\mu$s} & 0.884$\times$ & 84\% & 0.933 / 0.067 & 80\% / 89\% \\
+ & $\{Jacobi, GS, SymGS\}$ & 742\,$\mu$s & 742\,$\mu$s & \textit{742\,$\mu$s} & 1.000$\times$ & 89\% & 0.525 / 0.494 & 73\% / 73\% \\
+ & $\{Jacobi, GS, SymGS, Jacobi (0.67)\}$ & 740\,$\mu$s & 740\,$\mu$s & \textit{740\,$\mu$s} & 1.000$\times$ & 61\% & 0.958 / 0.042 & 55\% / 76\% \\
+ & $\{Jacobi, GS, SymGS, Jacobi (0.67), SOR (1.5)\}$ & 732\,$\mu$s & 732\,$\mu$s & \textit{732\,$\mu$s} & 1.000$\times$ & 62\% & $10^{-4}$ / 0.999 & 65\% / 64\% \\
+\midrule
+ConvDiff & $\{Jacobi, GS\}$ & 1.07\,ms & 887\,$\mu$s & \textit{854\,$\mu$s} & 0.829$\times$ & 69\% & 0.005 / 0.995 & 83\% / 86\% \\
+ & $\{Jacobi, GS, SymGS\}$ & 854\,$\mu$s & 890\,$\mu$s & \textit{856\,$\mu$s} & 1.042$\times$ & 91\% & 0.995 / 0.005 & 58\% / 65\% \\
+ & $\{Jacobi, GS, SymGS, Jacobi (0.67)\}$ & 888\,$\mu$s & 888\,$\mu$s & \textit{932\,$\mu$s} & 1.000$\times$ & 56\% & 0.459 / 0.541 & 57\% / 70\% \\
+ & $\{Jacobi, GS, SymGS, Jacobi (0.67), SOR (1.5)\}$ & 892\,$\mu$s & 892\,$\mu$s & \textit{936\,$\mu$s} & 1.000$\times$ & 53\% & 1.000 / $10^{-8}$ & 65\% / 74\% \\
+\bottomrule
+\end{tabular}}
+\newcommand{\caEnsBigRatioMin}{0.83$\times$}
+\newcommand{\caEnsBigRatioMax}{1.04$\times$}
+\newcommand{\caEnsBigGapMax}{4\%}
+\newcommand{\caEnsGapWuMax}{25\%}
+\newcommand{\caNumEnsBig}{8}
+\newcommand{\caEnsBigSameMin}{53\%}
+\newcommand{\caEnsBigSameMax}{91\%}
+\newcommand{\caEnsBigNFaster}{2}
+\newcommand{\caEnsBigNSlower}{3}
 \newcommand{\castatsbase}{
 \begin{tabular}{llcccc}
 \toprule
